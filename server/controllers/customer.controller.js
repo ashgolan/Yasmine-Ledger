@@ -1,39 +1,6 @@
 import Customer from "../models/Customer.js";
-import Account from "../models/Account.js";
-import Transaction from "../models/transaction.model.js";
+import Transaction from "../models/Transaction.js";
 import mongoose from "mongoose";
-
-// ➕ إضافة زبون + إنشاء حساب تلقائي
-export const createCustomer = async (req, res) => {
-  const { fullName, phone, note } = req.body;
-
-  if (!fullName?.trim()) {
-    return res.status(400).json({
-      message: "יש להזין שם לקוח.",
-    });
-  }
-
-  const customer = await Customer.create({
-    fullName: fullName.trim(),
-    phone: phone || "",
-    note: note || "",
-    createdBy: req.user._id,
-  });
-
-  // إنشاء حساب مفتوح تلقائي
-  await Account.create({
-    customer: customer._id,
-    createdBy: req.user._id,
-  });
-
-  return res.status(201).json({
-    message: "הלקוח נוצר בהצלחה.",
-    customer,
-  });
-};
-
-// 📥 جلب كل الزبائن
-
 export const getCustomers = async (req, res) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user._id);
@@ -105,6 +72,33 @@ export const getCustomers = async (req, res) => {
     console.error("getCustomers error:", err);
     res.status(500).json({
       message: "שגיאה בטעינת לקוחות",
+    });
+  }
+};
+
+
+export const createCustomer = async (req, res) => {
+  try {
+    const fullName = req.body.fullName?.trim();
+    const phone = req.body.phone?.trim() || "";
+
+    if (!fullName) {
+      return res.status(400).json({
+        message: "יש להזין שם לקוח",
+      });
+    }
+
+    const customer = await Customer.create({
+      fullName,
+      phone,
+      createdBy: req.user._id,
+    });
+
+    res.status(201).json(customer);
+  } catch (err) {
+    console.error("createCustomer error:", err);
+    res.status(500).json({
+      message: "שגיאה ביצירת לקוח",
     });
   }
 };

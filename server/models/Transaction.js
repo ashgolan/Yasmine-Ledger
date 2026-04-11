@@ -62,6 +62,9 @@ const transactionSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+transactionSchema.index({ createdBy: 1, customer: 1 });
+transactionSchema.index({ account: 1 });
+transactionSchema.index({ customer: 1, type: 1 });
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
 

@@ -1,7 +1,7 @@
 import express from "express";
 import { getCustomers } from "../controllers/customer.controller.js";
 import { createCustomer } from "../controllers/customer.controller.js";
-import auth from "../middlewares/auth.middleware.js";
+import { protect } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
