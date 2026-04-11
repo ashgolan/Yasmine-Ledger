@@ -111,10 +111,13 @@ export default function AccountPage() {
   const [archivedAccounts, setArchivedAccounts] = useState([]);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [selectedArchive, setSelectedArchive] = useState(null);
+  const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showArchivePrompt, setShowArchivePrompt] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const [form, setForm] = useState({
     type: "debt",
@@ -170,11 +173,34 @@ export default function AccountPage() {
     if (nav[field]) focus(nav[field]);
   };
 
+  // ── Archive ──
+  const handleArchive = async () => {
+    try {
+      setArchiving(true);
+      const accountId = data?.account?._id;
+      console.log("Archiving accountId:", accountId);
+      if (!accountId) {
+        setError("לא נמצא מזהה חשבון");
+        return;
+      }
+      const res = await api.post(`/accounts/archive/${accountId}`);
+      console.log("Archive response:", res.data);
+      setShowArchivePrompt(false);
+      setTab(1);
+      await fetchData();
+    } catch (err) {
+      console.error("Archive error:", err.response || err);
+      setError(err.response?.data?.message || "שגיאה בארכוב החשבון");
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   // ── Add transaction ──
   const handleAdd = async () => {
     if (!form.amount || !form.date || !form.type) return;
     try {
-      await api.post(`/transactions`, {
+      const txRes = await api.post(`/transactions`, {
         accountId: data?.account?._id,
         type: form.type, date: form.date,
         description: form.description,
@@ -185,6 +211,9 @@ export default function AccountPage() {
       });
       setForm(f => ({ ...f, description: "", quantity: "", unitPrice: "", amount: "", note: "" }));
       await fetchData();
+      if (txRes?.data?.shouldAskArchive) {
+        setShowArchivePrompt(true);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה בהוספת עסקה");
     }
@@ -234,7 +263,7 @@ export default function AccountPage() {
     if (!w) return;
     w.document.write(`<html dir="rtl"><head><title>חשבון לקוח</title>
     <style>body{font-family:Arial;padding:24px;direction:rtl;color:#111}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:10px;text-align:right;font-size:13px}th{background:#f5f5f5}.sum{margin-top:20px}.bal{font-size:20px;font-weight:700;margin-top:12px}</style></head>
-    <body><h2>${settings?.storeName||"חנות"}</h2><p>טלפון: ${settings?.storePhone||"—"}</p><p>תאריך: ${fmtDate(new Date())}</p>
+    <body><h2>${settings?.storeName||"חנות"}</h2><p>טלفون: ${settings?.storePhone||"—"}</p><p>תאריך: ${fmtDate(new Date())}</p>
     <table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="sum"><div>חובות: ${debtsTotal.toLocaleString("he-IL")} ₪</div><div>תשלומים: ${paymentsTotal.toLocaleString("he-IL")} ₪</div><div>החזרות: ${returnsTotal.toLocaleString("he-IL")} ₪</div>
     <div class="bal">יתרה: ${Number(balance||0).toLocaleString("he-IL")} ₪</div></div>
@@ -271,7 +300,43 @@ export default function AccountPage() {
         .note-wrap:hover .note-tooltip { opacity: 1 !important; }
       `}</style>
 
-      {/* Archive Modal */}
+      {/* ── Archive Confirmation Modal ── */}
+      {showArchivePrompt && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 420, padding: 32, boxShadow: "0 24px 60px rgba(0,0,0,0.18)", animation: "fadeIn 0.25s ease" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: C.teal.bg, color: C.teal.icon, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", border: `1.5px solid ${C.teal.border}` }}>
+              <svg width="26" height="26" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div style={{ textAlign: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#1a1a1a", marginBottom: 8 }}>החשבון מאוזן! ✓</div>
+              <div style={{ fontSize: 14, color: "#666", lineHeight: 1.7 }}>
+                יתרת החשבון הגיעה לאפס.<br/>
+                האם ברצונך להעביר את החשבון לארכיון?
+              </div>
+            </div>
+            <div style={{ background: C.amber.bg, border: `0.5px solid ${C.amber.border}`, borderRadius: 10, padding: "10px 14px", margin: "18px 0", fontSize: 12, color: C.amber.text, lineHeight: 1.6 }}>
+              💡 העברה לארכיון תשמור את כל ההיסטוריה ותאפשר פתיחת חשבון חדש ללקוח.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setShowArchivePrompt(false)}
+                style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "0.5px solid #ddd", background: "#fff", fontSize: 13, fontWeight: 600, color: "#666", cursor: "pointer" }}
+              >
+                לא, המשך
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "none", background: C.teal.icon, color: "#fff", fontSize: 13, fontWeight: 700, cursor: archiving ? "not-allowed" : "pointer", opacity: archiving ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              >
+                {Icon.archive} {archiving ? "מעביר..." : "כן, העבר לארכיון"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Archive Details Modal ── */}
       {archiveOpen && selectedArchive && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setArchiveOpen(false)}>
           <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "80vh", overflow: "auto", padding: 28 }} onClick={e => e.stopPropagation()}>
@@ -282,6 +347,9 @@ export default function AccountPage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: C.red.text, marginBottom: 16 }}>
               יתרה סופית: {fmtCurrency(selectedArchive.finalBalance || selectedArchive.balance || 0)}
             </div>
+            {archiveDetailLoading ? (
+              <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa", fontSize: 13 }}>טוען...</div>
+            ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "0.5px solid #f0f0f0" }}>
@@ -306,6 +374,7 @@ export default function AccountPage() {
                 })}
               </tbody>
             </table>
+            )}
           </div>
         </div>
       )}
@@ -661,7 +730,19 @@ export default function AccountPage() {
                           <td style={{ padding: "11px 14px", fontWeight: 700, color: "#1a1a1a" }}>{fmtCurrency(item.finalBalance)}</td>
                           <td style={{ padding: "11px 14px", color: "#888" }}>{item.transactionsCount}</td>
                           <td style={{ padding: "11px 14px" }}>
-                            <button onClick={() => { setSelectedArchive(item); setArchiveOpen(true); }} style={{
+                            <button onClick={async () => {
+                              try {
+                                setArchiveDetailLoading(item.account._id);
+                                setArchiveOpen(true);
+                                const res = await api.get(`/accounts/archived/${item.account._id}`);
+                                setSelectedArchive({ ...item, transactions: res.data.transactions });
+                              } catch (err) {
+                                setError(err.response?.data?.message || "שגיאה בטעינת הארכיון");
+                                setArchiveOpen(false);
+                              } finally {
+                                setArchiveDetailLoading(false);
+                              }
+                            }} style={{
                               background: C.purple.bg, color: C.purple.text, border: "none",
                               borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
                             }}>הצג</button>
