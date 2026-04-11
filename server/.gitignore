@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# environment variables (مهم جداً)
+.env
+
+# logs
+logs
+*.log
+
+# system files
+.DS_Store
+Thumbs.db
+
+# build folders
+dist/
+build/
+
+# cache
+.cache/
