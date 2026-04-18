@@ -17,6 +17,7 @@ import SettingsPage from "./pages/SettingsPage";
 import MainLayout from "./components/MainLayout";
 import LockScreen from "./components/LockScreen";
 import { useAuth } from "./context/AuthContext";
+import DeliveryNotesPage from "./pages/DeliveryNotesPage";
 
 function App() {
   const [mode] = useState("light");
@@ -78,6 +79,7 @@ function App() {
                   <Route path="account/:customerId" element={<AccountPage />} />
                   <Route path="items" element={<ItemsPage />} />
                   <Route path="quotes" element={<QuotesPage />} />
+                  <Route path="delivery-notes" element={<DeliveryNotesPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="*" element={<Navigate to="/" replace />} />

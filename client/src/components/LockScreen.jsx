@@ -45,6 +45,8 @@ export default function LockScreen({ onUnlock }) {
       display: "flex", alignItems: "center", justifyContent: "center",
       fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif",
       direction: "rtl",
+      padding: "16px",
+      boxSizing: "border-box",
     }}>
 
       {/* Decorative circles */}
@@ -61,43 +63,61 @@ export default function LockScreen({ onUnlock }) {
           pointerEvents: "none",
         }} />
       ))}
+
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
-        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.5} }
         @keyframes spin   { to{transform:rotate(360deg)} }
         .lock-input:focus { border-color: #534AB7 !important; box-shadow: 0 0 0 3px #EEEDFE !important; outline: none; }
         .unlock-btn:hover:not(:disabled) { background: #4338CA !important; }
         .unlock-btn:active:not(:disabled) { transform: scale(0.98); }
+
+        @media (max-width: 400px) {
+          .lock-card { padding: 28px 20px 24px !important; border-radius: 14px !important; }
+          .lock-icon-wrap { width: 54px !important; height: 54px !important; border-radius: 14px !important; }
+          .lock-title { font-size: 16px !important; }
+          .lock-code-input { font-size: 16px !important; padding: 10px 14px 10px 36px !important; }
+        }
       `}</style>
 
-      <div style={{
-        background: "#fff", borderRadius: 18,
-        padding: "36px 36px 32px",
-        width: "100%", maxWidth: 360,
-        animation: `fadeUp 0.35s ease, ${shake ? "shake 0.45s ease" : "none"}`,
-        boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
-      }}>
+      <div
+        className="lock-card"
+        style={{
+          background: "#fff", borderRadius: 18,
+          padding: "36px 36px 32px",
+          width: "100%", maxWidth: 360,
+          animation: shake ? "shake 0.45s ease" : "fadeUp 0.35s ease",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+          boxSizing: "border-box",
+        }}
+      >
 
         {/* Lock icon */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 18,
-            background: "#EEEDFE", color: "#534AB7",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 14,
-          }}>
+          <div
+            className="lock-icon-wrap"
+            style={{
+              width: 64, height: 64, borderRadius: 18,
+              background: "#EEEDFE", color: "#534AB7",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 14,
+            }}
+          >
             {Icon.lock}
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>המערכת נעולה</div>
-          <div style={{ fontSize: 13, color: "#aaa", textAlign: "center" }}>הזן את קוד הנעילה כדי להמשיך</div>
+          <div className="lock-title" style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>
+            המערכת נעולה
+          </div>
+          <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", lineHeight: 1.5 }}>
+            הזן את קוד הנעילה כדי להמשיך
+          </div>
         </div>
 
         {/* Code input */}
         <div style={{ marginBottom: error ? 10 : 20 }}>
           <div style={{ position: "relative" }}>
             <input
-              className="lock-input"
+              className="lock-input lock-code-input"
               type={showCode ? "text" : "password"}
               value={code}
               onChange={e => setCode(e.target.value)}
@@ -149,11 +169,12 @@ export default function LockScreen({ onUnlock }) {
           style={{
             width: "100%", background: "#534AB7", color: "#fff",
             border: "none", borderRadius: 10,
-            padding: "12px", fontSize: 14, fontWeight: 700,
+            padding: "13px", fontSize: 14, fontWeight: 700,
             cursor: loading || !code.trim() ? "not-allowed" : "pointer",
             opacity: !code.trim() ? 0.5 : 1,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             transition: "background 0.15s, transform 0.1s",
+            touchAction: "manipulation",
           }}
         >
           {loading ? (

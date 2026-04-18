@@ -66,7 +66,7 @@ function SectionHeader({ title, count }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function GlobalSearch() {
+export default function GlobalSearch({ autoFocus = false, onClose }) {
   const navigate = useNavigate();
   const inputRef = useRef();
   const dropdownRef = useRef();
@@ -83,6 +83,13 @@ export default function GlobalSearch() {
   ];
 
   const hasResults = results.customers.length > 0 || results.transactions.length > 0;
+
+  // ── Auto focus للموبايل ──
+  useEffect(() => {
+    if (autoFocus) {
+      setTimeout(() => inputRef.current?.querySelector("input")?.focus(), 80);
+    }
+  }, [autoFocus]);
 
   // ── Debounced search ──
   useEffect(() => {
@@ -116,7 +123,7 @@ export default function GlobalSearch() {
         else if (sel.data.customerId) navigate(`/account/${sel.data.customerId}`);
         handleClear();
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") { setOpen(false); onClose?.(); }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -134,13 +141,36 @@ export default function GlobalSearch() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleClear = () => { setQuery(""); setResults({ customers: [], transactions: [] }); setOpen(false); };
+  const handleClear = () => {
+    setQuery("");
+    setResults({ customers: [], transactions: [] });
+    setOpen(false);
+    onClose?.();
+  };
 
   const navigate2 = (path) => { navigate(path); handleClear(); };
 
   return (
-    <div style={{ position: "relative", width: 420, maxWidth: "100%", direction: "rtl" }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    <div style={{ position: "relative", width: "100%", maxWidth: 420, direction: "rtl" }}>
+      <style>{`
+        @keyframes spin    { to { transform: rotate(360deg) } }
+        @keyframes dropIn  { from { opacity:0; transform:translateY(-6px) } to { opacity:1; transform:translateY(0) } }
+
+        /* على الموبايل الـ dropdown يمتد بعرض الشاشة كاملاً */
+        @media (max-width: 768px) {
+          .gs-dropdown {
+            position: fixed !important;
+            top: 120px !important;
+            right: 0 !important;
+            left: 0 !important;
+            border-radius: 0 0 16px 16px !important;
+            max-height: calc(100vh - 130px) !important;
+            border-right: none !important;
+            border-left: none !important;
+            border-top: none !important;
+          }
+        }
+      `}</style>
 
       {/* ── Input ── */}
       <div ref={inputRef} style={{
@@ -150,7 +180,9 @@ export default function GlobalSearch() {
         boxShadow: open && query ? "0 0 0 3px #EEEDFE" : "none",
         transition: "border-color 0.15s, box-shadow 0.15s",
       }}>
-        <span style={{ color: open && query ? "#534AB7" : "#bbb", flexShrink: 0, display: "flex", transition: "color 0.15s" }}>{Icon.search}</span>
+        <span style={{ color: open && query ? "#534AB7" : "#bbb", flexShrink: 0, display: "flex", transition: "color 0.15s" }}>
+          {Icon.search}
+        </span>
         <input
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
@@ -160,11 +192,28 @@ export default function GlobalSearch() {
             flex: 1, border: "none", outline: "none", fontSize: 13,
             color: "#1a1a1a", background: "transparent",
             fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif", direction: "rtl",
+            minWidth: 0,
           }}
         />
         {loading && <Spinner />}
         {!loading && query && (
-          <button onClick={handleClear} style={{ background: "#f0f0f0", border: "none", borderRadius: 6, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#888", flexShrink: 0 }}>
+          <button onClick={handleClear} style={{
+            background: "#f0f0f0", border: "none", borderRadius: 6,
+            width: 22, height: 22, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#888", flexShrink: 0, touchAction: "manipulation",
+          }}>
+            {Icon.close}
+          </button>
+        )}
+        {/* زر إغلاق على الموبايل إذا كان مفتوحاً من الـ navbar */}
+        {onClose && !query && (
+          <button onClick={onClose} style={{
+            background: "#f0f0f0", border: "none", borderRadius: 6,
+            width: 22, height: 22, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#888", flexShrink: 0, touchAction: "manipulation",
+          }}>
             {Icon.close}
           </button>
         )}
@@ -172,12 +221,13 @@ export default function GlobalSearch() {
 
       {/* ── Dropdown ── */}
       {open && query.trim() && (
-        <div ref={dropdownRef} style={{
+        <div ref={dropdownRef} className="gs-dropdown" style={{
           position: "absolute", top: "calc(100% + 6px)", right: 0, left: 0, zIndex: 999,
           background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 12,
           overflow: "hidden", maxHeight: 460, overflowY: "auto",
           boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
           animation: "dropIn 0.15s ease",
+          WebkitOverflowScrolling: "touch",
         }}>
 
           {/* No results */}
@@ -200,15 +250,16 @@ export default function GlobalSearch() {
                   <div key={c._id} onClick={() => navigate2(`/account/${c._id}`)}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px 14px", cursor: "pointer",
+                      padding: "12px 14px", cursor: "pointer",
                       background: isActive ? "#EEEDFE" : "#fff",
                       borderBottom: i < results.customers.length - 1 ? "0.5px solid #f5f5f5" : "none",
                       transition: "background 0.1s",
+                      touchAction: "manipulation",
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#FAFAFE"; }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "#fff"; }}
                   >
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: av.bg, color: av.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: av.bg, color: av.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                       {initials(c.fullName)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -218,7 +269,7 @@ export default function GlobalSearch() {
                         <span>{c.phone || "ללא מספר טלפון"}</span>
                       </div>
                     </div>
-                    <div style={{ width: 26, height: 26, borderRadius: 7, background: isActive ? "#534AB7" : "#f5f5f5", color: isActive ? "#fff" : "#bbb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: isActive ? "#534AB7" : "#f5f5f5", color: isActive ? "#fff" : "#bbb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                       {Icon.person}
                     </div>
                   </div>
@@ -244,15 +295,16 @@ export default function GlobalSearch() {
                     onClick={() => { if (tx.customerId) navigate2(`/account/${tx.customerId}`); }}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 10,
-                      padding: "10px 14px", cursor: tx.customerId ? "pointer" : "default",
+                      padding: "12px 14px", cursor: tx.customerId ? "pointer" : "default",
                       background: isActive ? "#EEEDFE" : "#fff",
                       borderBottom: i < results.transactions.length - 1 ? "0.5px solid #f5f5f5" : "none",
                       transition: "background 0.1s",
+                      touchAction: "manipulation",
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#FAFAFE"; }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "#fff"; }}
                   >
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: color.bg, color: color.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 9, background: color.bg, color: color.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
                       {Icon.receipt}
                     </div>
 
@@ -264,11 +316,9 @@ export default function GlobalSearch() {
                           {label}
                         </span>
                       </div>
-
                       <div style={{ fontSize: 12, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                         {tx.description || "ללא תיאור"}
                       </div>
-
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 11, color: "#ccc" }}>{fmtDate(tx.date)}</span>
                         <span style={{ fontSize: 13, fontWeight: 800, color: color.text, whiteSpace: "nowrap" }}>

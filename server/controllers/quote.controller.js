@@ -3,30 +3,21 @@ import Customer from "../models/Customer.js";
 import Account from "../models/Account.js";
 import Transaction from "../models/Transaction.js";
 import Counter from "../models/Counter.js";
+
 const generateQuoteNumber = async () => {
     const counter = await Counter.findOneAndUpdate(
         { key: "quoteNumber" },
         { $inc: { seq: 1 } },
         { new: true, upsert: true }
     );
-
     return `Q-${String(counter.seq).padStart(4, "0")}`;
 };
 
 export const createQuote = async (req, res) => {
-    const {
-        customer,
-        customerName,
-        customerPhone,
-        date,
-        items,
-        note,
-    } = req.body;
+    const { customer, customerName, customerPhone, date, items, note } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({
-            message: "יש להוסיף לפחות שורה אחת להצעת המחיר.",
-        });
+        return res.status(400).json({ message: "יש להוסיף לפחות שורה אחת להצעת המחיר." });
     }
 
     const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -51,10 +42,7 @@ export const createQuote = async (req, res) => {
         createdBy: req.user._id,
     });
 
-    return res.status(201).json({
-        message: "הצעת המחיר נוצרה בהצלחה.",
-        quote,
-    });
+    return res.status(201).json({ message: "הצעת המחיר נוצרה בהצלחה.", quote });
 };
 
 export const getQuotes = async (req, res) => {
@@ -72,13 +60,27 @@ export const getQuoteById = async (req, res) => {
         .populate("convertedAccount");
 
     if (!quote) {
-        return res.status(404).json({
-            message: "הצעת המחיר לא נמצאה.",
-        });
+        return res.status(404).json({ message: "הצעת המחיר לא נמצאה." });
     }
 
     return res.status(200).json(quote);
 };
+
+// ── ספירת הצעות מחיר + תעודות משלוח לפי לקוח ──────────────────────────────
+export const getQuoteCountByCustomer = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const count = await Quote.countDocuments({
+            customer: customerId,
+            createdBy: req.user._id,
+        });
+        return res.status(200).json({ count });
+    } catch (err) {
+        console.error("getQuoteCountByCustomer error:", err);
+        return res.status(500).json({ message: "שגיאה בספירת הצעות המחיר" });
+    }
+};
+
 export const convertQuoteToAccount = async (req, res) => {
     try {
         const { quoteId } = req.params;
@@ -87,15 +89,11 @@ export const convertQuoteToAccount = async (req, res) => {
         const quote = await Quote.findById(quoteId);
 
         if (!quote) {
-            return res.status(404).json({
-                message: "הצעת המחיר לא נמצאה.",
-            });
+            return res.status(404).json({ message: "הצעת המחיר לא נמצאה." });
         }
 
         if (String(quote.createdBy) !== String(userId)) {
-            return res.status(403).json({
-                message: "אין הרשאה לבצע פעולה זו.",
-            });
+            return res.status(403).json({ message: "אין הרשאה לבצע פעולה זו." });
         }
 
         if (quote.status === "converted") {
@@ -107,22 +105,17 @@ export const convertQuoteToAccount = async (req, res) => {
         }
 
         if (!quote.items || quote.items.length === 0) {
-            return res.status(400).json({
-                message: "לא ניתן להמיר הצעת מחיר ריקה.",
-            });
+            return res.status(400).json({ message: "לא ניתן להמיר הצעת מחיר ריקה." });
         }
 
         let customerId = quote.customer;
 
-        // אם אין לקוח מקושר, ניצור לקוח חדש אוטומטית מתוך פרטי ההצעה
         if (!customerId) {
             const customerName = quote.customerName?.trim() || "";
             const customerPhone = quote.customerPhone?.trim() || "";
 
             if (!customerName) {
-                return res.status(400).json({
-                    message: "לא ניתן להמיר הצעת מחיר ללא שם לקוח.",
-                });
+                return res.status(400).json({ message: "לא ניתן להמיר הצעת מחיר ללא שם לקוח." });
             }
 
             const newCustomer = await Customer.create({
@@ -137,10 +130,7 @@ export const convertQuoteToAccount = async (req, res) => {
             quote.customer = newCustomer._id;
         }
 
-        let account = await Account.findOne({
-            customer: customerId,
-            status: "open",
-        });
+        let account = await Account.findOne({ customer: customerId, status: "open" });
 
         if (!account) {
             account = await Account.create({
@@ -170,7 +160,6 @@ export const convertQuoteToAccount = async (req, res) => {
         quote.status = "converted";
         quote.convertedAt = new Date();
         quote.convertedAccount = account._id;
-
         await quote.save();
 
         return res.status(200).json({
@@ -181,8 +170,6 @@ export const convertQuoteToAccount = async (req, res) => {
         });
     } catch (error) {
         console.error("convertQuoteToAccount error:", error);
-        return res.status(500).json({
-            message: "אירעה שגיאה בהמרת הצעת המחיר לחשבון.",
-        });
+        return res.status(500).json({ message: "אירעה שגיאה בהמרת הצעת המחיר לחשבון." });
     }
 };

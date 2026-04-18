@@ -52,6 +52,11 @@ const transactionSchema = new mongoose.Schema(
       maxlength: 1000,
       default: "",
     },
+    deliveryNote: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DeliveryNote",
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -17,33 +17,7 @@ export const getMySettings = async (req, res) => {
   return res.status(200).json(settings);
 };
 
-export const updateMySettings = async (req, res) => {
-  const { storeName, storePhone, storeAddress, footerText } = req.body;
 
-  let settings = await Setting.findOne({ createdBy: req.user._id });
-
-  if (!settings) {
-    settings = await Setting.create({
-      createdBy: req.user._id,
-      storeName: storeName?.trim() || "",
-      storePhone: storePhone?.trim() || "",
-      storeAddress: storeAddress?.trim() || "",
-      footerText: footerText?.trim() || "",
-    });
-  } else {
-    settings.storeName = storeName?.trim() || "";
-    settings.storePhone = storePhone?.trim() || "";
-    settings.storeAddress = storeAddress?.trim() || "";
-    settings.footerText = footerText?.trim() || "";
-
-    await settings.save();
-  }
-
-  return res.status(200).json({
-    message: "ההגדרות נשמרו בהצלחה.",
-    settings,
-  });
-};
 
 export const updateSecuritySettings = async (req, res) => {
   const { currentPassword, newPassword, newLockCode } = req.body;
@@ -101,4 +75,30 @@ export const updateSecuritySettings = async (req, res) => {
   return res.status(200).json({
     message: "הגדרות האבטחה עודכנו בהצלחה.",
   });
+};
+
+export const updateMySettings = async (req, res) => {
+  const { storeName, storePhone, storeAddress, footerText, logoBase64 } = req.body;
+
+  let settings = await Setting.findOne({ createdBy: req.user._id });
+
+  if (!settings) {
+    settings = await Setting.create({
+      createdBy: req.user._id,
+      storeName:    storeName?.trim()    || "",
+      storePhone:   storePhone?.trim()   || "",
+      storeAddress: storeAddress?.trim() || "",
+      footerText:   footerText?.trim()   || "",
+      logoBase64:   logoBase64           || "",
+    });
+  } else {
+    settings.storeName    = storeName?.trim()    || "";
+    settings.storePhone   = storePhone?.trim()   || "";
+    settings.storeAddress = storeAddress?.trim() || "";
+    settings.footerText   = footerText?.trim()   || "";
+    if (logoBase64 !== undefined) settings.logoBase64 = logoBase64;
+    await settings.save();
+  }
+
+  return res.status(200).json({ message: "ההגדרות נשמרו בהצלחה.", settings });
 };
