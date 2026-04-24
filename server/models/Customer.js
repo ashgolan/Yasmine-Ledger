@@ -14,6 +14,12 @@ const customerSchema = new mongoose.Schema(
       maxlength: 30,
       default: "",
     },
+    idNumber: {
+      type: String,
+      trim: true,
+      maxlength: 20,
+      default: "",
+    },
     note: {
       type: String,
       trim: true,
@@ -36,5 +42,4 @@ const customerSchema = new mongoose.Schema(
 );
 
 const Customer = mongoose.model("Customer", customerSchema);
-
 export default Customer;

@@ -5,10 +5,11 @@ import Transaction from "../models/Transaction.js";
 export const getCustomerAccount = async (req, res) => {
   const { customerId } = req.params;
 
-const account = await Account.findOne({
-  customer: customerId,
-  status: "open",
-}).populate("customer", "fullName phone");
+  const account = await Account.findOne({
+    customer: customerId,
+    status: "open",
+  }).populate("customer", "fullName phone idNumber")
+
 
   if (!account) {
     return res.status(404).json({

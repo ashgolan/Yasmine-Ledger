@@ -18,6 +18,7 @@ import MainLayout from "./components/MainLayout";
 import LockScreen from "./components/LockScreen";
 import { useAuth } from "./context/AuthContext";
 import DeliveryNotesPage from "./pages/DeliveryNotesPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 
 function App() {
   const [mode] = useState("light");
@@ -75,6 +76,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<MainLayout />}>
                   <Route index element={<Dashboard />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="customers" element={<CustomersPage />} />
                   <Route path="account/:customerId" element={<AccountPage />} />
                   <Route path="items" element={<ItemsPage />} />

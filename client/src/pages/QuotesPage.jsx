@@ -36,7 +36,6 @@ const Icon = {
   account: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.3" /><path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
   save: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 14V3l2-1h6l2 2v10H3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><rect x="5" y="9" width="6" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.3" /></svg>,
   doc: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M6 6h4M6 9h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
-  phone: <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 2h3l1.5 3.5L6 7a7.9 7.9 0 004 4l1.5-1.5L15 11v3a1 1 0 01-1 1A13 13 0 012 3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>,
   search: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" /><path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
   close: <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
   tag: <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 2h5l7 7-5 5-7-7V2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><circle cx="5" cy="5" r="1" fill="currentColor" /></svg>,
@@ -63,6 +62,45 @@ function SectionBar({ title, color = "#534AB7" }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
       <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
       <span style={{ fontSize: 12, fontWeight: 700, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase" }}>{title}</span>
+    </div>
+  );
+}
+
+// ── Mobile Row Card ──────────────────────────────────────────────────────────
+function MobileRowCard({ row, index, items, updateRow, removeRow, showRemove }) {
+  return (
+    <div style={{ background: "#FAFBFF", border: "0.5px solid #e8e8f0", borderRadius: 12, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#aaa", letterSpacing: "0.05em" }}>פריט {index + 1}</span>
+        {showRemove && (
+          <button onClick={() => removeRow(row.id)} style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: C.red.bg, color: C.red.icon, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation" }}>{Icon.trash}</button>
+        )}
+      </div>
+      <Field label="תאריך">
+        <input type="date" value={row.date} onChange={e => updateRow(row.id, { date: e.target.value })} style={{ ...inputStyle, fontSize: 12 }} />
+      </Field>
+      <Field label="פריט / תיאור">
+        <input list="items-list-m" value={row.description}
+          onChange={e => {
+            const val = e.target.value;
+            const match = items.find(it => it.name === val);
+            if (match) updateRow(row.id, { description: val, unitPrice: match.price || "", item: match._id });
+            else updateRow(row.id, { description: val, item: null });
+          }}
+          placeholder="בחר פריט או הקלד..." style={inputStyle} />
+        <datalist id="items-list-m">{items.map(it => <option key={it._id} value={it.name} />)}</datalist>
+      </Field>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Field label="כמות" style={{ flex: 1 }}>
+          <input type="number" value={row.quantity} onChange={e => updateRow(row.id, { quantity: e.target.value })} placeholder="0" style={{ ...inputStyle, textAlign: "center" }} />
+        </Field>
+        <Field label="מחיר ₪" style={{ flex: 1 }}>
+          <input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, { unitPrice: e.target.value })} placeholder="₪" style={{ ...inputStyle, textAlign: "center" }} />
+        </Field>
+        <Field label="סכום ₪" style={{ flex: 1 }}>
+          <input type="number" value={row.amount} onChange={e => updateRow(row.id, { amount: e.target.value })} placeholder="₪" style={{ ...inputStyle, fontWeight: 700, textAlign: "center" }} />
+        </Field>
+      </div>
     </div>
   );
 }
@@ -157,143 +195,73 @@ export default function QuotesPage() {
       if (res.data.customerId) navigate(`/account/${res.data.customerId}`);
     } catch (err) { setError(err.response?.data?.message || "שגיאה בהמרת הצעת המחיר"); }
   };
+
   const handlePrint = async (q) => {
     try {
       const res = await api.get(`/quotes/${q._id}`);
       const quote = res.data;
       const custName = quote.customerName || quote.customer?.fullName || "—";
-      const custPhone = quote.customerPhone || quote.customer?.phone || "—";
-
+      const custPhone = quote.customerPhone || quote.customer?.phone || "";
       const rowsHtml = quote.items.map(item => `
-      <tr>
-        <td>${fmtDate(item.date)}</td>
-        <td>${item.description || "—"}</td>
-        <td style="text-align:center">${item.quantity || "—"}</td>
-        <td style="text-align:center">${item.unitPrice || "—"}</td>
-        <td style="text-align:left;font-weight:700">${Number(item.amount || 0).toLocaleString("he-IL")} ₪</td>
-      </tr>`).join("");
-
-      const logoHtml = settings?.logoBase64
-        ? `<img src="${settings.logoBase64}" style="max-width:280px;max-height:80px;object-fit:contain;display:block" />`
-        : `<div style="font-size:22px;font-weight:800;color:#111">${settings?.storeName || ""}</div>`;
-
+        <tr>
+          <td>${fmtDate(item.date)}</td><td>${item.description || "—"}</td>
+          <td style="text-align:center">${item.quantity || "—"}</td>
+          <td style="text-align:center">${item.unitPrice || "—"}</td>
+          <td style="text-align:left;font-weight:700">${Number(item.amount || 0).toLocaleString("he-IL")} ₪</td>
+        </tr>`).join("");
+      const logoBanner = settings?.logoBase64
+        ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>`
+        : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
+      const storeInfo = [settings?.storePhone ? `טלפון: ${settings.storePhone}` : "", settings?.storeAddress || ""].filter(Boolean).join(" · ");
       const w = window.open("", "_blank", "width=1000,height=800");
       if (!w) return;
-
-      w.document.write(`
-      <html dir="rtl">
-      <head>
-        <title>הצעת מחיר — ${quote.quoteNumber}</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: Arial, sans-serif; padding: 28px 32px; direction: rtl; color: #111; background: #fff; }
-          .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid #eee; margin-bottom: 18px; }
-          .header-left { display: flex; flex-direction: column; gap: 4px; }
-          .header-right { text-align: left; font-size: 12px; color: #666; line-height: 1.8; }
-          .header-right strong { color: #111; }
-          .store-info { font-size: 12px; color: #777; margin-top: 5px; line-height: 1.7; }
-          .customer-box { background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.8; }
-          .customer-box .name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ddd; padding: 9px 11px; text-align: right; font-size: 13px; }
-          th { background: #f5f5f5; font-weight: 700; color: #444; }
-          tr:nth-child(even) { background: #fafafa; }
-          .total-box { margin-top: 16px; display: flex; justify-content: flex-start; }
-          .total-inner { background: #EEEDFE; border: 1px solid #AFA9EC; border-radius: 8px; padding: 10px 20px; display: flex; align-items: center; gap: 12px; }
-          .total-label { font-size: 13px; color: #534AB7; font-weight: 600; }
-          .total-value { font-size: 20px; font-weight: 800; color: #3C3489; }
-          .note-box { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 7px; padding: 10px 14px; margin-top: 16px; font-size: 13px; }
-          .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #888; text-align: center; }
-          @media print { body { padding: 16px; } }
-        </style>
-      </head>
-      <body>
-
-        <!-- ── Header ── -->
-        <div class="header">
-          <div class="header-left">
-            ${logoHtml}
-            <div class="store-info">
-              ${settings?.storePhone ? `<span>טלפון: ${settings.storePhone}</span>` : ""}
-              ${settings?.storeAddress ? `<span> · ${settings.storeAddress}</span>` : ""}
-            </div>
-          </div>
-          <div class="header-right">
-            <div>מספר הצעה: <strong>${quote.quoteNumber}</strong></div>
-            <div>תאריך: <strong>${fmtDate(quote.date)}</strong></div>
-            <div>סטטוס: <strong>${quote.status === "converted" ? "הומר לחשבון" : "טיוטה"}</strong></div>
-          </div>
-        </div>
-
-        <!-- ── Customer ── -->
-        <div class="customer-box">
-          <div class="name">${custName}</div>
-          ${custPhone !== "—" ? `<div>טלפון: ${custPhone}</div>` : ""}
-        </div>
-
-        <!-- ── Table ── -->
-        <table>
-          <thead>
-            <tr>
-              <th>תאריך</th>
-              <th>פריט / תיאור</th>
-              <th style="text-align:center">כמות</th>
-              <th style="text-align:center">מחיר יחידה</th>
-              <th style="text-align:left">סכום</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-
-        <!-- ── Total ── -->
-        <div class="total-box">
-          <div class="total-inner">
-            <span class="total-label">סה״כ לתשלום</span>
-            <span class="total-value">${Number(quote.total || 0).toLocaleString("he-IL")} ₪</span>
-          </div>
-        </div>
-
-        <!-- ── Note ── -->
+      w.document.write(`<html dir="rtl"><head><title>הצעת מחיר — ${quote.quoteNumber}</title>
+        <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;direction:rtl;color:#111;background:#fff}
+        .logo-banner{width:100%;background:#f8f8f8;border-bottom:2px solid #eee;display:flex;align-items:center;justify-content:center;padding:18px 32px;min-height:80px}
+        .logo-text{font-size:26px;font-weight:800;color:#1a1a1a}
+        .store-info{text-align:center;font-size:12px;color:#888;padding:7px 32px 10px;border-bottom:1px solid #f0f0f0}
+        .details{display:flex;justify-content:space-between;padding:14px 32px;border-bottom:1px solid #eee;font-size:12px;color:#555;line-height:1.9}
+        .details strong{color:#111;font-size:13px}.details-right{text-align:right}.details-left{text-align:left;color:#666}
+        .content{padding:0 32px 32px}table{width:100%;border-collapse:collapse;margin-top:16px}
+        th,td{border:1px solid #ddd;padding:9px 11px;text-align:right;font-size:13px}th{background:#f5f5f5;font-weight:700;color:#444}tr:nth-child(even){background:#fafafa}
+        .total-box{margin-top:16px;display:flex}.total-inner{background:#EEEDFE;border:1px solid #AFA9EC;border-radius:8px;padding:10px 20px;display:flex;align-items:center;gap:12px}
+        .total-label{font-size:13px;color:#534AB7;font-weight:600}.total-value{font-size:20px;font-weight:800;color:#3C3489}
+        .note-box{background:#fffbe6;border:1px solid #ffe58f;border-radius:7px;padding:10px 14px;margin-top:16px;font-size:13px}
+        .footer{margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center}</style></head>
+        <body>${logoBanner}${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}
+        <div class="details"><div class="details-right"><div>לקוח: <strong>${custName}</strong></div>${custPhone ? `<div>טלפון: <strong>${custPhone}</strong></div>` : ""}</div>
+        <div class="details-left"><div>מספר הצעה: <strong>${quote.quoteNumber}</strong></div><div>תאריך: <strong>${fmtDate(quote.date)}</strong></div><div>סטטוס: <strong>${quote.status === "converted" ? "הומר לחשבון" : "טיוטה"}</strong></div></div></div>
+        <div class="content"><table><thead><tr><th>תאריך</th><th>פריט / תיאור</th><th style="text-align:center">כמות</th><th style="text-align:center">מחיר יחידה</th><th style="text-align:left">סכום</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+        <div class="total-box"><div class="total-inner"><span class="total-label">סה״כ לתשלום</span><span class="total-value">${Number(quote.total || 0).toLocaleString("he-IL")} ₪</span></div></div>
         ${quote.note ? `<div class="note-box"><strong>הערה:</strong> ${quote.note}</div>` : ""}
-
-        <!-- ── Footer ── -->
-        ${settings?.footerText
-          ? `<div class="footer">${settings.footerText}</div>`
-          : ""}
-
-        <script>window.onload = () => window.print()</script>
-      </body>
-      </html>
-    `);
+        ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}
+        </div><script>window.onload=()=>window.print()</script></body></html>`);
       w.document.close();
     } catch (err) { setError("שגיאה בהדפסה"); }
   };
 
   return (
-    <div style={{
-      direction: "rtl", minHeight: "100vh", background: "#F5F6FA",
-      padding: "16px", boxSizing: "border-box",
-      fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif",
-    }}>
+    <div style={{ direction: "rtl", minHeight: "100vh", background: "#F5F6FA", padding: "16px", boxSizing: "border-box", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif" }}>
       <style>{`
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        input:focus, select:focus, textarea:focus { border-color: #AFA9EC !important; box-shadow: 0 0 0 3px #EEEDFE !important; outline: none; }
-        .quote-card:hover { border-color: #AFA9EC !important; }
-        .row-del { opacity: 0; transition: opacity 0.15s; }
-        tr:hover .row-del { opacity: 1 !important; }
-        .cust-opt:hover { background: #FAFAFE !important; }
-        textarea { resize: vertical; }
-
-        /* جدول الفورم قابل للتمرير */
-        .quote-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-        /* شبكة البطاقات */
-        .quotes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-
-        @media (max-width: 540px) {
-          .quotes-grid  { grid-template-columns: 1fr !important; }
-          .q-header     { padding: 14px 16px !important; }
-          .q-form       { padding: 14px !important; }
+        input:focus, select:focus, textarea:focus { border-color:#AFA9EC !important; box-shadow:0 0 0 3px #EEEDFE !important; outline:none; }
+        .quote-card:hover { border-color:#AFA9EC !important; }
+        .row-del { opacity:0; transition:opacity 0.15s; }
+        tr:hover .row-del { opacity:1 !important; }
+        .cust-opt:hover { background:#FAFAFE !important; }
+        textarea { resize:vertical; }
+        .quote-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .quotes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:12px; }
+        /* Desktop: show table, hide mobile cards */
+        .desktop-table { display:block; }
+        .mobile-rows   { display:none; }
+        @media (max-width: 600px) {
+          .quotes-grid   { grid-template-columns:1fr !important; }
+          .q-header      { padding:14px !important; }
+          .q-form        { padding:14px !important; }
+          /* hide table, show cards */
+          .desktop-table { display:none !important; }
+          .mobile-rows   { display:flex !important; flex-direction:column; gap:10px; margin-bottom:14px; }
         }
       `}</style>
 
@@ -315,12 +283,11 @@ export default function QuotesPage() {
 
         {error && <div style={{ background: C.red.bg, color: C.red.text, border: `0.5px solid ${C.red.border}`, borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>{error}</div>}
 
-        {/* ── New quote form ── */}
+        {/* ── Form ── */}
         <div className="q-form" style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14, padding: "18px 18px" }}>
           <SectionBar title="הצעת מחיר חדשה" color="#854F0B" />
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-
             {/* Customer autocomplete */}
             <Field label="לקוח" style={{ flex: "1 1 200px", position: "relative" }}>
               <div style={{ position: "relative" }}>
@@ -342,7 +309,7 @@ export default function QuotesPage() {
                   {filteredCustomers.map(c => {
                     const av = avatarColor(c.fullName);
                     return (
-                      <div key={c._id} className="cust-opt" onMouseDown={(e) => { e.preventDefault(); selectCustomer(c) }}
+                      <div key={c._id} className="cust-opt" onMouseDown={e => { e.preventDefault(); selectCustomer(c); }}
                         style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: "0.5px solid #f5f5f5", touchAction: "manipulation" }}>
                         <div style={{ width: 30, height: 30, borderRadius: "50%", background: av.bg, color: av.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{initials(c.fullName)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -356,11 +323,9 @@ export default function QuotesPage() {
                 </div>
               )}
             </Field>
-
             <Field label="טלפון" style={{ flex: "1 1 130px" }}>
               <input value={quoteInfo.customerPhone} onChange={e => setQuoteInfo(p => ({ ...p, customerPhone: e.target.value }))} placeholder="050-0000000" style={inputStyle} />
             </Field>
-
             <Field label="תאריך" style={{ flex: "0 0 135px" }}>
               <input type="date" value={quoteInfo.date} onChange={e => setQuoteInfo(p => ({ ...p, date: e.target.value }))} style={inputStyle} />
             </Field>
@@ -370,51 +335,61 @@ export default function QuotesPage() {
             <textarea value={quoteInfo.note} onChange={e => setQuoteInfo(p => ({ ...p, note: e.target.value }))} placeholder="הוסף הערה להצעת המחיר..." rows={2} style={{ ...inputStyle, lineHeight: 1.6 }} />
           </Field>
 
-          {/* جدول مع scroll أفقي */}
-          <div className="quote-table-wrap" style={{ marginBottom: 14 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 520, border: "0.5px solid #e8e8e8", borderRadius: 10, overflow: "hidden" }}>
-              <thead>
-                <tr style={{ background: "#FAFAFA", borderBottom: "0.5px solid #f0f0f0" }}>
-                  {["תאריך", "פריט / תיאור", "כמות", "מחיר יחידה", "סכום", ""].map(h => (
-                    <th key={h} style={{ padding: "9px 9px", textAlign: "right", fontWeight: 600, fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={row.id} style={{ borderBottom: i < rows.length - 1 ? "0.5px solid #f5f5f5" : "none" }}>
-                    <td style={{ padding: "7px 8px", width: 115 }}>
-                      <input type="date" value={row.date} onChange={e => updateRow(row.id, { date: e.target.value })} style={{ ...inputStyle, fontSize: 12 }} />
-                    </td>
-                    <td style={{ padding: "7px 8px", minWidth: 160 }}>
-                      <input ref={i === 0 ? descRef : null} list="items-list" value={row.description}
-                        onChange={e => {
-                          const val = e.target.value;
-                          const match = items.find(it => it.name === val);
-                          if (match) updateRow(row.id, { description: val, unitPrice: match.price || "", item: match._id });
-                          else updateRow(row.id, { description: val, item: null });
-                        }}
-                        placeholder="בחר פריט או הקלד..." style={inputStyle} />
-                      <datalist id="items-list">{items.map(it => <option key={it._id} value={it.name} />)}</datalist>
-                    </td>
-                    <td style={{ padding: "7px 8px", width: 65 }}>
-                      <input type="number" value={row.quantity} onChange={e => updateRow(row.id, { quantity: e.target.value })} placeholder="0" style={{ ...inputStyle, textAlign: "center" }} />
-                    </td>
-                    <td style={{ padding: "7px 8px", width: 90 }}>
-                      <input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, { unitPrice: e.target.value })} placeholder="₪" style={{ ...inputStyle, textAlign: "center" }} />
-                    </td>
-                    <td style={{ padding: "7px 8px", width: 95 }}>
-                      <input type="number" value={row.amount} onChange={e => updateRow(row.id, { amount: e.target.value })} placeholder="₪" style={{ ...inputStyle, fontWeight: 700, textAlign: "center" }} />
-                    </td>
-                    <td style={{ padding: "7px 8px", width: 32 }}>
-                      <button className="row-del" onClick={() => removeRow(row.id)} style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: C.red.bg, color: C.red.icon, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{Icon.trash}</button>
-                    </td>
+          {/* ── Desktop Table ── */}
+          <div className="desktop-table">
+            <div className="quote-table-wrap" style={{ marginBottom: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 520, border: "0.5px solid #e8e8e8", borderRadius: 10, overflow: "hidden" }}>
+                <thead>
+                  <tr style={{ background: "#FAFAFA", borderBottom: "0.5px solid #f0f0f0" }}>
+                    {["תאריך", "פריט / תיאור", "כמות", "מחיר יחידה", "סכום", ""].map(h => (
+                      <th key={h} style={{ padding: "9px 9px", textAlign: "right", fontWeight: 600, fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr key={row.id} style={{ borderBottom: i < rows.length - 1 ? "0.5px solid #f5f5f5" : "none" }}>
+                      <td style={{ padding: "7px 8px", width: 115 }}>
+                        <input type="date" value={row.date} onChange={e => updateRow(row.id, { date: e.target.value })} style={{ ...inputStyle, fontSize: 12 }} />
+                      </td>
+                      <td style={{ padding: "7px 8px", minWidth: 160 }}>
+                        <input ref={i === 0 ? descRef : null} list="items-list-d" value={row.description}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const match = items.find(it => it.name === val);
+                            if (match) updateRow(row.id, { description: val, unitPrice: match.price || "", item: match._id });
+                            else updateRow(row.id, { description: val, item: null });
+                          }}
+                          placeholder="בחר פריט או הקלד..." style={inputStyle} />
+                        <datalist id="items-list-d">{items.map(it => <option key={it._id} value={it.name} />)}</datalist>
+                      </td>
+                      <td style={{ padding: "7px 8px", width: 65 }}>
+                        <input type="number" value={row.quantity} onChange={e => updateRow(row.id, { quantity: e.target.value })} placeholder="0" style={{ ...inputStyle, textAlign: "center" }} />
+                      </td>
+                      <td style={{ padding: "7px 8px", width: 90 }}>
+                        <input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, { unitPrice: e.target.value })} placeholder="₪" style={{ ...inputStyle, textAlign: "center" }} />
+                      </td>
+                      <td style={{ padding: "7px 8px", width: 95 }}>
+                        <input type="number" value={row.amount} onChange={e => updateRow(row.id, { amount: e.target.value })} placeholder="₪" style={{ ...inputStyle, fontWeight: 700, textAlign: "center" }} />
+                      </td>
+                      <td style={{ padding: "7px 8px", width: 32 }}>
+                        <button className="row-del" onClick={() => removeRow(row.id)} style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: C.red.bg, color: C.red.icon, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{Icon.trash}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
+          {/* ── Mobile Cards ── */}
+          <div className="mobile-rows">
+            {rows.map((row, i) => (
+              <MobileRowCard key={row.id} row={row} index={i} items={items} updateRow={updateRow} removeRow={removeRow} showRemove={rows.length > 1} />
+            ))}
+          </div>
+
+          {/* ── Footer ── */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
             <button onClick={addRow} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f5f5f5", color: "#555", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>
               {Icon.plus} הוסף שורה
@@ -452,14 +427,8 @@ export default function QuotesPage() {
               const custName = quote.customerName || quote.customer?.fullName || "—";
               const av = avatarColor(custName);
               const statusColor = isConverted ? C.teal : C.gray;
-
               return (
-                <div key={quote._id} className="quote-card" style={{
-                  background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14,
-                  padding: "16px 16px", display: "flex", flexDirection: "column", gap: 12,
-                  transition: "border-color 0.15s",
-                }}>
-                  {/* Header */}
+                <div key={quote._id} className="quote-card" style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14, padding: "16px", display: "flex", flexDirection: "column", gap: 12, transition: "border-color 0.15s" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                       <div style={{ width: 36, height: 36, borderRadius: "50%", background: av.bg, color: av.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{initials(custName)}</div>
@@ -475,8 +444,6 @@ export default function QuotesPage() {
                       {isConverted ? "הומר" : "טיוטה"}
                     </span>
                   </div>
-
-                  {/* Details */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {[
                       ["תאריך", fmtDate(quote.date)],
@@ -493,14 +460,10 @@ export default function QuotesPage() {
                       <div style={{ fontSize: 11, color: C.blue.text, fontWeight: 600, background: C.blue.bg, borderRadius: 6, padding: "3px 8px", marginTop: 2 }}>לקוח חדש / לא מקושר</div>
                     )}
                   </div>
-
-                  {/* Total */}
                   <div style={{ background: "#FAFAFA", borderRadius: 8, padding: "9px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
                     <span style={{ fontSize: 11, color: "#aaa", fontWeight: 500 }}>סה״כ</span>
                     <span style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a" }}>{fmtCurrency(quote.total)}</span>
                   </div>
-
-                  {/* Buttons */}
                   <div style={{ display: "flex", gap: 7 }}>
                     <button onClick={() => handlePrint(quote)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "#fff", color: "#555", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px", fontSize: 12, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>
                       {Icon.print} הדפס

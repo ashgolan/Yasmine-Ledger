@@ -10,6 +10,7 @@ const Icon = {
   items:     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 5l6-3 6 3v6l-6 3-6-3V5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M8 2v12M2 5l6 3 6-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
   quotes:    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><path d="M6 6h4M6 9h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
   delivery:  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><path d="M11 7h2.5L15 10v3h-4V7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><circle cx="4" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2" /><circle cx="12" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2" /></svg>,
+  analytics: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
   settings:  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.3" /><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
   logout:    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   logo:      <svg width="22" height="22" viewBox="0 0 32 32" fill="none"><path d="M4 8h24M4 16h16M4 24h20" stroke="#534AB7" strokeWidth="2.5" strokeLinecap="round" /><circle cx="26" cy="24" r="4" fill="#FAEEDA" stroke="#FAC775" strokeWidth="1.5" /><path d="M24.5 24l1 1L27.5 23" stroke="#854F0B" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
@@ -24,6 +25,7 @@ const NAV = [
   { label: "פריטים",       path: "/items",           icon: Icon.items     },
   { label: "הצעות מחיר",   path: "/quotes",          icon: Icon.quotes    },
   { label: "תעודות משלוח", path: "/delivery-notes",  icon: Icon.delivery  },
+  { label: "דוחות",        path: "/analytics",       icon: Icon.analytics },
   { label: "הגדרות",       path: "/settings",        icon: Icon.settings  },
 ];
 
@@ -33,7 +35,7 @@ const BOTTOM_NAV = [
   { label: "לקוחות", path: "/customers",      icon: Icon.customers },
   { label: "פריטים", path: "/items",          icon: Icon.items     },
   { label: "הצעות",  path: "/quotes",         icon: Icon.quotes    },
-  { label: "משלוח",  path: "/delivery-notes", icon: Icon.delivery  },
+  { label: "דוחות",  path: "/analytics",      icon: Icon.analytics },
 ];
 
 export default function MainLayout() {
@@ -195,7 +197,6 @@ export default function MainLayout() {
 
           {/* Mobile actions — search + menu */}
           <div className="mobile-actions" style={{ marginRight: "auto", alignItems: "center", gap: 4 }}>
-            {/* Search icon */}
             <button
               onClick={() => setSearchOpen(p => !p)}
               style={{
@@ -208,7 +209,6 @@ export default function MainLayout() {
             >
               {Icon.search}
             </button>
-            {/* Hamburger */}
             <button
               onClick={() => setMenuOpen(p => !p)}
               style={{
@@ -319,7 +319,8 @@ export default function MainLayout() {
               className={`bottom-btn${active ? " active" : ""}`}
               onClick={() => navigate(path)}
             >
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center",
+              <span style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
                 width: 28, height: 28, borderRadius: 8,
                 background: active ? "#EEEDFE" : "transparent",
                 transition: "background 0.15s",
@@ -335,7 +336,8 @@ export default function MainLayout() {
           className={`bottom-btn${isActive("/settings") ? " active" : ""}`}
           onClick={() => navigate("/settings")}
         >
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center",
+          <span style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
             width: 28, height: 28, borderRadius: 8,
             background: isActive("/settings") ? "#EEEDFE" : "transparent",
             transition: "background 0.15s",

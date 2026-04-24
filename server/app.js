@@ -18,6 +18,8 @@ import deliveryNotes from "./routes/deliveryNotes.routes.js";
 import settingRoutes from "./routes/setting.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import searchRoutes from "./routes/search.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
+
 dotenv.config();
 
 const app = express();
@@ -59,6 +61,8 @@ app.use("/api/delivery-notes", deliveryNotes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/search", searchRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
 app.use(notFound);
 app.use(errorHandler);
 

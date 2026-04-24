@@ -71,7 +71,7 @@ function SectionBar({ title, color = "#534AB7" }) {
   );
 }
 
-// ── Modal تعديل — Bottom Sheet على الموبايل ──
+// ── Modal تعديل ──
 function EditNoteModal({ note, onClose, onSaved }) {
   const [rows, setRows] = useState(note.items.map(item => ({ ...item, id: crypto.randomUUID() })));
   const [noteText, setNoteText] = useState(note.note || "");
@@ -269,104 +269,155 @@ export default function DeliveryNotesPage() {
     try { await api.post(`/delivery-notes/${note._id}/sync`); await fetchNotes(); }
     catch (err) { setError(err.response?.data?.message || "שגיאה בסנכרון"); }
   };
-const handlePrint = async (n) => {
-  try {
-    const res = await api.get(`/delivery-notes/${n._id}`);
-    const note = res.data;
-    const custName = note.customerName || note.customer?.fullName || "—";
-    const custPhone = note.customerPhone || note.customer?.phone || "";
 
-    const rowsHtml = note.items.map(item => `
-      <tr>
-        <td>${fmtDate(item.date)}</td>
-        <td>${item.description || "—"}</td>
-        <td style="text-align:center">${item.quantity || "—"}</td>
-        <td style="text-align:center">□</td>
-      </tr>`).join("");
+  // ── Print ──
+  const handlePrint = async (n) => {
+    try {
+      const res = await api.get(`/delivery-notes/${n._id}`);
+      const note = res.data;
+      const custName = note.customerName || note.customer?.fullName || "—";
+      const custPhone = note.customerPhone || note.customer?.phone || "";
 
-    const logoHtml = settings?.logoBase64
-      ? `<img src="${settings.logoBase64}" style="max-width:280px;max-height:80px;object-fit:contain;display:block" />`
-      : `<div style="font-size:22px;font-weight:800;color:#111">${settings?.storeName || ""}</div>`;
+      const rowsHtml = note.items.map(item => `
+        <tr>
+          <td>${fmtDate(item.date)}</td>
+          <td>${item.description || "—"}</td>
+          <td style="text-align:center">${item.quantity || "—"}</td>
+          <td style="text-align:center">□</td>
+        </tr>`).join("");
 
-    const w = window.open("", "_blank", "width=1000,height=800");
-    if (!w) return;
+      // לוגו בנר רחב או שם חנות
+      const logoBanner = settings?.logoBase64
+        ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>`
+        : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
 
-    w.document.write(`
-      <html dir="rtl">
-      <head>
-        <title>תעודת משלוח ${note.noteNumber}</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: Arial, sans-serif; padding: 28px 32px; direction: rtl; color: #111; background: #fff; }
-          .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid #eee; margin-bottom: 18px; }
-          .header-left { display: flex; flex-direction: column; gap: 4px; }
-          .header-right { text-align: left; font-size: 12px; color: #666; line-height: 1.8; }
-          .header-right strong { color: #111; }
-          .store-info { font-size: 12px; color: #777; margin-top: 5px; line-height: 1.7; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: right; font-size: 13px; }
-          th { background: #f5f5f5; font-weight: 700; color: #444; }
-          tr:nth-child(even) { background: #fafafa; }
-          .note-box { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 7px; padding: 10px 14px; margin-top: 16px; font-size: 13px; }
-          .sign { margin-top: 60px; display: flex; justify-content: space-between; }
-          .sign-box { border-top: 1.5px solid #333; width: 200px; text-align: center; padding-top: 8px; font-size: 12px; color: #555; }
-          .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #eee; font-size: 12px; color: #888; text-align: center; }
-          @media print { body { padding: 16px; } }
-        </style>
-      </head>
-      <body>
+      const storeInfo = [
+        settings?.storePhone  ? `טלפון: ${settings.storePhone}`  : "",
+        settings?.storeAddress || "",
+      ].filter(Boolean).join(" · ");
 
-        <!-- ── Header ── -->
-        <div class="header">
-          <div class="header-left">
-            ${logoHtml}
-            <div class="store-info">
-              ${settings?.storePhone  ? `<span>טלפון: ${settings.storePhone}</span>` : ""}
-              ${settings?.storeAddress ? `<span> · ${settings.storeAddress}</span>` : ""}
+      const w = window.open("", "_blank", "width=1000,height=800");
+      if (!w) return;
+
+      w.document.write(`
+        <html dir="rtl">
+        <head>
+          <title>תעודת משלוח — ${note.noteNumber}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; direction: rtl; color: #111; background: #fff; }
+
+            /* ── בנר לוגו ── */
+            .logo-banner {
+              width: 100%; background: #f8f8f8;
+              border-bottom: 2px solid #eee;
+              display: flex; align-items: center; justify-content: center;
+              padding: 18px 32px; min-height: 80px;
+            }
+            .logo-text { font-size: 26px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px; }
+
+            /* ── שורת פרטי חנות ── */
+            .store-info {
+              text-align: center; font-size: 12px; color: #888;
+              padding: 7px 32px 10px; border-bottom: 1px solid #f0f0f0;
+            }
+
+            /* ── פרטי מסמך ── */
+            .details {
+              display: flex; justify-content: space-between; align-items: flex-start;
+              padding: 14px 32px; border-bottom: 1px solid #eee;
+              font-size: 12px; color: #555; line-height: 1.9;
+            }
+            .details strong { color: #111; font-size: 13px; }
+            .details-right { text-align: right; }
+            .details-left  { text-align: left; color: #666; }
+
+            /* ── גוף הדף ── */
+            .content { padding: 0 32px 32px; }
+
+            /* ── טבלה ── */
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: right; font-size: 13px; }
+            th { background: #f5f5f5; font-weight: 700; color: #444; }
+            tr:nth-child(even) { background: #fafafa; }
+
+            /* ── הערה ── */
+            .note-box {
+              background: #fffbe6; border: 1px solid #ffe58f;
+              border-radius: 7px; padding: 10px 14px;
+              margin-top: 16px; font-size: 13px;
+            }
+
+            /* ── חתימות ── */
+            .sign {
+              margin-top: 60px; display: flex; justify-content: space-between;
+              padding: 0 16px;
+            }
+            .sign-box {
+              border-top: 1.5px solid #333; width: 200px;
+              text-align: center; padding-top: 8px;
+              font-size: 12px; color: #555;
+            }
+
+            /* ── כותרת תחתונה ── */
+            .footer {
+              margin-top: 24px; padding-top: 12px;
+              border-top: 1px solid #eee;
+              font-size: 12px; color: #888; text-align: center;
+            }
+
+            @media print { body {} }
+          </style>
+        </head>
+        <body>
+
+          ${logoBanner}
+          ${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}
+
+          <div class="details">
+            <div class="details-right">
+              <div>לקוח: <strong>${custName}</strong></div>
+              ${custPhone ? `<div>טלפון: <strong>${custPhone}</strong></div>` : ""}
+            </div>
+            <div class="details-left">
+              <div>מספר תעודה: <strong>${note.noteNumber}</strong></div>
+              <div>תאריך: <strong>${fmtDate(note.date)}</strong></div>
             </div>
           </div>
-          <div class="header-right">
-            <div>מספר תעודה: <strong>${note.noteNumber}</strong></div>
-            <div>תאריך: <strong>${fmtDate(note.date)}</strong></div>
-            <div>לקוח: <strong>${custName}</strong></div>
-            ${custPhone ? `<div>טלפון: <strong>${custPhone}</strong></div>` : ""}
+
+          <div class="content">
+
+            <table>
+              <thead>
+                <tr>
+                  <th>תאריך</th>
+                  <th>פריט / תיאור</th>
+                  <th style="text-align:center">כמות</th>
+                  <th style="text-align:center">התקבל ✓</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+
+            ${note.note ? `<div class="note-box"><strong>הערה:</strong> ${note.note}</div>` : ""}
+
+            <div class="sign">
+              <div class="sign-box">חתימת מוסר</div>
+              <div class="sign-box">חתימת מקבל</div>
+            </div>
+
+            ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}
+
           </div>
-        </div>
 
-        <!-- ── Table ── -->
-        <table>
-          <thead>
-            <tr>
-              <th>תאריך</th>
-              <th>פריט / תיאור</th>
-              <th style="text-align:center">כמות</th>
-              <th style="text-align:center">התקבל ✓</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
+          <script>window.onload = () => window.print()</script>
+        </body>
+        </html>
+      `);
+      w.document.close();
+    } catch (err) { setError("שגיאה בהדפסה"); }
+  };
 
-        <!-- ── Note ── -->
-        ${note.note ? `<div class="note-box"><strong>הערה:</strong> ${note.note}</div>` : ""}
-
-        <!-- ── Signatures ── -->
-        <div class="sign">
-          <div class="sign-box">חתימת מוסר</div>
-          <div class="sign-box">חתימת מקבל</div>
-        </div>
-
-        <!-- ── Footer ── -->
-        ${settings?.footerText
-          ? `<div class="footer">${settings.footerText}</div>`
-          : ""}
-
-        <script>window.onload = () => window.print()</script>
-      </body>
-      </html>
-    `);
-    w.document.close();
-  } catch (err) { setError("שגיאה בהדפסה"); }
-};
   return (
     <div style={{ direction: "rtl", minHeight: "100vh", background: "#F5F6FA", padding: "16px", boxSizing: "border-box", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif" }}>
       <style>{`

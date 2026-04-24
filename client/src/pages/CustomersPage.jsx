@@ -40,11 +40,11 @@ function formatDate(dateStr) {
 }
 function getDebtLevel(amount) {
   const v = Number(amount || 0);
-  if (v <= 0)    return { label: "ללא חוב",      ...C.teal  };
-  if (v <= 500)  return { label: "חוב נמוך",     ...C.blue  };
-  if (v <= 2000) return { label: "חוב בינוני",   ...C.amber };
-  if (v <= 5000) return { label: "חוב גבוה",     ...C.red   };
-                 return { label: "חוב גבוה מאוד",...C.red   };
+  if (v <= 0)    return { label: "ללא חוב",       ...C.teal  };
+  if (v <= 500)  return { label: "חוב נמוך",      ...C.blue  };
+  if (v <= 2000) return { label: "חוב בינוני",    ...C.amber };
+  if (v <= 5000) return { label: "חוב גבוה",      ...C.red   };
+                 return { label: "חוב גבוה מאוד", ...C.red   };
 }
 
 const Icon = {
@@ -53,6 +53,7 @@ const Icon = {
   close:    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
   phone:    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 2h3l1.5 3.5L6 7a7.9 7.9 0 004 4l1.5-1.5L15 11v3a1 1 0 01-1 1A13 13 0 012 3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   person:   <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+  id:       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M8 7h4M8 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   empty:    <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="18" r="9" stroke="#ccc" strokeWidth="1.5"/><path d="M6 42c0-9.941 8.059-15 18-15s18 5.059 18 15" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   calendar: <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M5 2v2M11 2v2M2 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
   arrow:    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
@@ -75,13 +76,13 @@ function Skeleton({ w, h, radius = 6 }) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function NewCustomerModal({ open, onClose, onSaved }) {
-  const [form, setForm] = useState({ fullName: "", phone: "" });
+  const [form, setForm] = useState({ fullName: "", phone: "", idNumber: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleClose = () => {
     if (loading) return;
-    setForm({ fullName: "", phone: "" });
+    setForm({ fullName: "", phone: "", idNumber: "" });
     setError("");
     onClose();
   };
@@ -90,8 +91,12 @@ function NewCustomerModal({ open, onClose, onSaved }) {
     if (!form.fullName.trim()) { setError("יש להזין שם לקוח"); return; }
     try {
       setLoading(true); setError("");
-      await api.post("/customers", { fullName: form.fullName.trim(), phone: form.phone.trim() });
-      setForm({ fullName: "", phone: "" });
+      await api.post("/customers", {
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim(),
+        idNumber: form.idNumber.trim(),
+      });
+      setForm({ fullName: "", phone: "", idNumber: "" });
       onSaved();
       onClose();
     } catch (err) {
@@ -100,6 +105,13 @@ function NewCustomerModal({ open, onClose, onSaved }) {
   };
 
   if (!open) return null;
+
+  const fieldStyle = {
+    width: "100%", boxSizing: "border-box",
+    border: "0.5px solid #ddd", borderRadius: 9,
+    padding: "10px 36px 10px 12px",
+    fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit",
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
@@ -118,6 +130,8 @@ function NewCustomerModal({ open, onClose, onSaved }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* שם מלא */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 5 }}>שם מלא *</label>
             <div style={{ position: "relative" }}>
@@ -126,9 +140,11 @@ function NewCustomerModal({ open, onClose, onSaved }) {
                 onChange={e => setForm({ ...form, fullName: e.target.value })}
                 onKeyDown={e => e.key === "Enter" && handleSave()}
                 placeholder="ישראל ישראלי"
-                style={{ width: "100%", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 9, padding: "10px 36px 10px 12px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit" }} />
+                style={fieldStyle} />
             </div>
           </div>
+
+          {/* טלפון */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 5 }}>טלפון</label>
             <div style={{ position: "relative" }}>
@@ -137,9 +153,26 @@ function NewCustomerModal({ open, onClose, onSaved }) {
                 onChange={e => setForm({ ...form, phone: e.target.value })}
                 onKeyDown={e => e.key === "Enter" && handleSave()}
                 placeholder="050-0000000"
-                style={{ width: "100%", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 9, padding: "10px 36px 10px 12px", fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit" }} />
+                style={fieldStyle} />
             </div>
           </div>
+
+          {/* תעודת זהות */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 5 }}>
+              תעודת זהות <span style={{ color: "#bbb", fontWeight: 400 }}>(אופציונלי)</span>
+            </label>
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "absolute", top: "50%", right: 11, transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none" }}>{Icon.id}</div>
+              <input value={form.idNumber}
+                onChange={e => setForm({ ...form, idNumber: e.target.value })}
+                onKeyDown={e => e.key === "Enter" && handleSave()}
+                placeholder="000000000"
+                maxLength={20}
+                style={{ ...fieldStyle, fontFamily: "monospace, Arial", letterSpacing: "0.05em" }} />
+            </div>
+          </div>
+
           {error && (
             <div style={{ background: "#FCEBEB", color: "#791F1F", border: "0.5px solid #F09595", borderRadius: 8, padding: "9px 12px", fontSize: 12, fontWeight: 600 }}>{error}</div>
           )}
@@ -171,19 +204,23 @@ function CustomerRow({ c, onClick, isLast }) {
       touchAction: "manipulation",
     }}>
       <Avatar name={c.fullName} />
-
-      {/* Name + phone */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {c.fullName || "—"}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#bbb", fontSize: 12 }}>
-          {Icon.phone}
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.phone || "ללא מספר טלפון"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#bbb", fontSize: 12 }}>
+            {Icon.phone}
+            <span>{c.phone || "ללא טלפון"}</span>
+          </div>
+          {c.idNumber && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3, color: "#aaa", fontSize: 11 }}>
+              {Icon.id}
+              <span style={{ fontFamily: "monospace" }}>{c.idNumber}</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Balance + bar — hidden on very small screens */}
       <div className="bal-col" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: debt.text, whiteSpace: "nowrap" }}>{formatCurrency(c.balance)}</div>
@@ -200,8 +237,6 @@ function CustomerRow({ c, onClick, isLast }) {
           }} />
         </div>
       </div>
-
-      {/* Date — hidden on small screens */}
       <div className="date-col" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0, minWidth: 80 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#bbb" }}>
           {Icon.calendar}
@@ -209,7 +244,6 @@ function CustomerRow({ c, onClick, isLast }) {
         </div>
         <span style={{ fontSize: 12, fontWeight: 600, color: "#888" }}>{formatDate(c.openedAt)}</span>
       </div>
-
       <div className="open-btn" style={{ width: 28, height: 28, borderRadius: 8, background: "#EEEDFE", color: "#534AB7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0, transition: "opacity 0.15s" }}>
         {Icon.arrow}
       </div>
@@ -234,8 +268,13 @@ function CustomerCard({ c, onClick }) {
           {c.fullName || "—"}
         </div>
         {c.phone && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#bbb", fontSize: 12, marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#bbb", fontSize: 12, marginBottom: 2 }}>
             {Icon.phone}<span>{c.phone}</span>
+          </div>
+        )}
+        {c.idNumber && (
+          <div style={{ display: "flex", alignItems: "center", gap: 3, color: "#aaa", fontSize: 11, marginBottom: 4 }}>
+            {Icon.id}<span style={{ fontFamily: "monospace" }}>{c.idNumber}</span>
           </div>
         )}
         <div style={{ height: 5, borderRadius: 99, background: "#f0f0f0", overflow: "hidden" }}>
@@ -282,6 +321,7 @@ export default function CustomersPage() {
     return customers.filter(c =>
       (c.fullName?.toLowerCase() || "").includes(q) ||
       (c.phone || "").includes(searchQuery.trim()) ||
+      (c.idNumber || "").includes(searchQuery.trim()) ||
       String(c.balance ?? "").includes(searchQuery.trim())
     );
   }, [customers, searchQuery]);
@@ -297,12 +337,8 @@ export default function CustomersPage() {
         .cust-row:hover { background: #fafafe !important; }
         .cust-row:hover .open-btn { opacity: 1 !important; }
         input:focus { border-color: #AFA9EC !important; box-shadow: 0 0 0 3px #EEEDFE !important; }
-
-        /* Desktop list */
         .cust-list-desktop { display: flex; flex-direction: column; }
-        /* Mobile cards */
         .cust-list-mobile  { display: none; flex-direction: column; gap: 8px; }
-
         @media (max-width: 640px) {
           .cust-list-desktop { display: none !important; }
           .cust-list-mobile  { display: flex !important; }
@@ -351,7 +387,7 @@ export default function CustomersPage() {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="חפש לפי שם לקוח, טלפון או סכום..."
+            placeholder="חפש לפי שם, טלפון, תעודת זהות או סכום..."
             style={{ flex: 1, border: "none", outline: "none", fontSize: 14, color: "#1a1a1a", background: "transparent", fontFamily: "inherit", minWidth: 0 }}
           />
           {searchQuery && (
@@ -390,7 +426,7 @@ export default function CustomersPage() {
               {searchQuery ? "לא נמצאו לקוחות" : "אין לקוחות להצגה"}
             </div>
             <div style={{ fontSize: 12, color: "#ccc", marginBottom: 20 }}>
-              {searchQuery ? "נסה לחפש בשם אחר, מספר טלפון או סכום" : "הוסף את הלקוח הראשון שלך עכשיו"}
+              {searchQuery ? "נסה לחפש בשם אחר, טלפון, תעודת זהות או סכום" : "הוסף את הלקוח הראשון שלך עכשיו"}
             </div>
             {!searchQuery && (
               <button onClick={() => setModalOpen(true)} style={{ background: "#534AB7", color: "#fff", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -400,14 +436,11 @@ export default function CustomersPage() {
           </div>
         ) : (
           <>
-            {/* Desktop list */}
             <div className="cust-list-desktop" style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14, overflow: "hidden" }}>
               {filtered.map((c, i) => (
                 <CustomerRow key={c._id} c={c} isLast={i === filtered.length - 1} onClick={() => navigate(`/account/${c._id}`)} />
               ))}
             </div>
-
-            {/* Mobile cards */}
             <div className="cust-list-mobile">
               {filtered.map(c => (
                 <CustomerCard key={c._id} c={c} onClick={() => navigate(`/account/${c._id}`)} />
@@ -415,7 +448,6 @@ export default function CustomersPage() {
             </div>
           </>
         )}
-
       </div>
     </div>
   );
