@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
 
@@ -255,6 +255,40 @@ export default function Dashboard() {
     // ── Export ──
     const handleBackupFromReminder = async () => { setBackupReminderVisible(false); await handleExportJson(); };
 
+    // ── Import Backup ──
+    const importFileRef = useRef(null);
+    const [importModal, setImportModal] = useState(false);       // מודל אישור
+    const [importLoading, setImportLoading] = useState(false);
+    const [importResult, setImportResult] = useState(null);      // תוצאה אחרי שחזור
+    const [importFile, setImportFile] = useState(null);          // הקובץ שנבחר
+
+    const handleImportSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImportFile(file);
+        setImportModal(true);
+        e.target.value = "";
+    };
+
+    const handleImportConfirm = async () => {
+        if (!importFile) return;
+        try {
+            setImportLoading(true);
+            const formData = new FormData();
+            formData.append("backup", importFile);
+            const res = await api.post("/dashboard/import-backup", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            setImportResult(res.data);
+            setImportModal(false);
+            setImportFile(null);
+        } catch (err) {
+            alert(err.response?.data?.message || "שגיאה בשחזור הגיבוי");
+        } finally {
+            setImportLoading(false);
+        }
+    };
+
     const handleExportExcel = async () => {
         try {
             setExportLoading(true); setExportModal(false);
@@ -348,6 +382,74 @@ export default function Dashboard() {
                             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
                             {exportLoading ? "מייצא..." : "ייצוא"}
                         </button>
+
+                        {/* Import Button */}
+                        <input ref={importFileRef} type="file" accept=".zip" onChange={handleImportSelect} style={{ display: "none" }} />
+                        <button onClick={() => importFileRef.current?.click()}
+                            style={{ display: "flex", alignItems: "center", gap: 6, background: C.teal.bg, border: `0.5px solid ${C.teal.border}`, borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: C.teal.text, cursor: "pointer", touchAction: "manipulation", whiteSpace: "nowrap" }}>
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 14V6M5 9l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                            ייבוא גיבוי
+                        </button>
+
+                        {/* ── Import Confirm Modal ── */}
+                        {importModal && (
+                            <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                                onClick={() => { setImportModal(false); setImportFile(null); }}>
+                                <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 360, padding: "28px 24px", direction: "rtl", boxShadow: "0 24px 60px rgba(0,0,0,0.2)" }}
+                                    onClick={e => e.stopPropagation()}>
+                                    <div style={{ width: 52, height: 52, borderRadius: 14, background: C.amber.bg, color: C.amber.icon, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 26 }}>⚠️</div>
+                                    <div style={{ textAlign: "center", marginBottom: 16 }}>
+                                        <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 8 }}>שחזור גיבוי</div>
+                                        <div style={{ fontSize: 13, color: "#666", lineHeight: 1.7 }}>
+                                            פעולה זו תמחק את <strong>כל הנתונים הקיימים</strong> ותחליף אותם בנתונים מקובץ הגיבוי.<br />
+                                            <span style={{ color: C.red.text, fontWeight: 600 }}>לא ניתן לבטל פעולה זו.</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ background: "#f8f8f8", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#888", marginBottom: 20, textAlign: "center" }}>
+                                        📦 {importFile?.name}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                        <button onClick={handleImportConfirm} disabled={importLoading}
+                                            style={{ flex: 1, background: "#534AB7", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: importLoading ? "not-allowed" : "pointer", opacity: importLoading ? 0.7 : 1 }}>
+                                            {importLoading ? "משחזר..." : "אישור — שחזר עכשיו"}
+                                        </button>
+                                        <button onClick={() => { setImportModal(false); setImportFile(null); }}
+                                            style={{ background: "#f5f5f5", color: "#555", border: "none", borderRadius: 10, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                                            ביטול
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Import Success Modal ── */}
+                        {importResult && (
+                            <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                                <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 360, padding: "28px 24px", direction: "rtl", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
+                                    <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+                                    <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 16 }}>הגיבוי שוחזר בהצלחה!</div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+                                        {[
+                                            ["לקוחות",      importResult.restored?.customers],
+                                            ["חשבונות",     importResult.restored?.accounts],
+                                            ["עסקאות",      importResult.restored?.transactions],
+                                            ["פריטים",      importResult.restored?.items],
+                                            ["הצעות מחיר",  importResult.restored?.quotes],
+                                            ["תעודות משלוח",importResult.restored?.deliveryNotes],
+                                        ].map(([label, count]) => (
+                                            <div key={label} style={{ background: C.teal.bg, borderRadius: 10, padding: "10px", border: `0.5px solid ${C.teal.border}` }}>
+                                                <div style={{ fontSize: 18, fontWeight: 800, color: C.teal.text }}>{count ?? 0}</div>
+                                                <div style={{ fontSize: 11, color: "#666" }}>{label}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => { setImportResult(null); window.location.reload(); }}
+                                        style={{ width: "100%", background: "#534AB7", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                                        סיום — רענן את הדף
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Export Modal */}
                         {exportModal && (

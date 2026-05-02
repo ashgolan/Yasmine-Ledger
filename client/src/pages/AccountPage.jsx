@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/axios";
 
@@ -123,13 +123,19 @@ function TxCard({ t, onEdit, onDelete }) {
 }
 
 // ── Edit Customer Modal ──
-function EditCustomerModal({ open, onClose, customer, onSaved }) {
+function EditCustomerModal({ open, onClose, customer, onSaved, knownLastNames = [] }) {
     const [form, setForm] = useState({ fullName: "", phone: "", idNumber: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeSuggestion, setActiveSuggestion] = useState(-1);
 
     useEffect(() => {
-        if (open && customer) { setForm({ fullName: customer.fullName || "", phone: customer.phone || "", idNumber: customer.idNumber || "" }); setError(""); }
+        if (open && customer) {
+            setForm({ fullName: customer.fullName || "", phone: customer.phone || "", idNumber: customer.idNumber || "" });
+            setError(""); setSuggestions([]); setShowSuggestions(false);
+        }
     }, [open, customer]);
 
     const handleClose = () => { if (loading) return; onClose(); };
@@ -141,6 +147,39 @@ function EditCustomerModal({ open, onClose, customer, onSaved }) {
             onSaved(); onClose();
         } catch (err) { setError(err.response?.data?.message || "שגיאה בעדכון פרטי הלקוח"); }
         finally { setLoading(false); }
+    };
+
+    const handleNameChange = (e) => {
+        const val = e.target.value;
+        setForm({ ...form, fullName: val });
+        setActiveSuggestion(-1);
+        const parts = val.split(/\s+/);
+        if (parts.length >= 2 && parts[parts.length - 1].length >= 1) {
+            const lastPart = parts[parts.length - 1].toLowerCase();
+            const filtered = knownLastNames.filter(ln =>
+                ln.toLowerCase().startsWith(lastPart) && ln.toLowerCase() !== lastPart
+            );
+            setSuggestions(filtered.slice(0, 6));
+            setShowSuggestions(filtered.length > 0);
+        } else {
+            setSuggestions([]); setShowSuggestions(false);
+        }
+    };
+
+    const applySuggestion = (lastName) => {
+        const parts = form.fullName.trim().split(/\s+/);
+        parts[parts.length - 1] = lastName;
+        setForm({ ...form, fullName: parts.join(" ") });
+        setSuggestions([]); setShowSuggestions(false); setActiveSuggestion(-1);
+    };
+
+    const handleNameKeyDown = (e) => {
+        if (!showSuggestions) { if (e.key === "Enter") handleSave(); return; }
+        if (e.key === "ArrowDown") { e.preventDefault(); setActiveSuggestion(i => Math.min(i + 1, suggestions.length - 1)); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setActiveSuggestion(i => Math.max(i - 1, -1)); }
+        else if (e.key === "Enter") { e.preventDefault(); activeSuggestion >= 0 ? applySuggestion(suggestions[activeSuggestion]) : handleSave(); }
+        else if (e.key === "Escape") { setSuggestions([]); setShowSuggestions(false); }
+        else if (e.key === "Tab" && activeSuggestion >= 0) { e.preventDefault(); applySuggestion(suggestions[activeSuggestion]); }
     };
 
     if (!open) return null;
@@ -158,8 +197,30 @@ function EditCustomerModal({ open, onClose, customer, onSaved }) {
                     <div>
                         <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 5 }}>שם מלא *</label>
                         <div style={{ position: "relative" }}>
-                            <div style={{ position: "absolute", top: "50%", right: 11, transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none" }}>{Icon.person}</div>
-                            <input autoFocus value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} onKeyDown={e => e.key === "Enter" && handleSave()} placeholder="ישראל ישראלי" style={{ ...inputStyle, paddingRight: 36 }} />
+                            <div style={{ position: "absolute", top: "50%", right: 11, transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none", zIndex: 1 }}>{Icon.person}</div>
+                            <input autoFocus value={form.fullName}
+                                onChange={handleNameChange}
+                                onKeyDown={handleNameKeyDown}
+                                onBlur={() => setTimeout(() => { setSuggestions([]); setShowSuggestions(false); }, 150)}
+                                placeholder="ישראל ישראלי"
+                                autoComplete="off"
+                                style={{ ...inputStyle, paddingRight: 36 }} />
+                            {showSuggestions && suggestions.length > 0 && (
+                                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, left: 0, zIndex: 200, background: "#fff", border: "0.5px solid #e0ddf8", borderRadius: 10, boxShadow: "0 6px 24px rgba(83,74,183,0.10)", overflow: "hidden" }}>
+                                    <div style={{ padding: "6px 10px 4px", fontSize: 10, color: "#aaa", fontWeight: 600, borderBottom: "0.5px solid #f0f0f0", letterSpacing: "0.04em" }}>משפחות מוכרות</div>
+                                    {suggestions.map((ln, idx) => {
+                                        const typed = form.fullName.trim().split(/\s+/).pop();
+                                        return (
+                                            <div key={ln} onMouseDown={() => applySuggestion(ln)}
+                                                onMouseEnter={() => setActiveSuggestion(idx)}
+                                                style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", background: idx === activeSuggestion ? "#EEEDFE" : "transparent", color: idx === activeSuggestion ? "#3C3489" : "#1a1a1a", display: "flex", alignItems: "center", gap: 4, fontWeight: idx === activeSuggestion ? 600 : 400, transition: "background 0.1s" }}>
+                                                <span style={{ color: "#534AB7", fontWeight: 700 }}>{ln.slice(0, typed.length)}</span>
+                                                <span>{ln.slice(typed.length)}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div>
@@ -277,6 +338,27 @@ export default function AccountPage() {
     const [editCustomerOpen, setEditCustomerOpen] = useState(false);
     const [deleteCustomerOpen, setDeleteCustomerOpen] = useState(false);
     const [deleteStats, setDeleteStats] = useState(null);
+    const [profitOpen, setProfitOpen] = useState(false);
+    const [pinOpen, setPinOpen] = useState(false);
+    const [pinCode, setPinCode] = useState("");
+    const [pinError, setPinError] = useState("");
+    const [pinLoading, setPinLoading] = useState(false);
+    const [pinShake, setPinShake] = useState(false);
+
+    const handlePinSubmit = async () => {
+        if (!pinCode.trim()) return;
+        try {
+            setPinLoading(true); setPinError("");
+            await api.post("/auth/verify-lock-code", { lockCode: pinCode });
+            setPinOpen(false); setPinCode(""); setPinError("");
+            setProfitOpen(true);
+        } catch {
+            setPinError("קוד שגוי, נסה שוב");
+            setPinShake(true);
+            setTimeout(() => setPinShake(false), 450);
+            setPinCode("");
+        } finally { setPinLoading(false); }
+    };
 
     // ── Batch form ──
     const today = new Date().toISOString().slice(0, 10);
@@ -299,19 +381,32 @@ export default function AccountPage() {
         return () => window.removeEventListener("resize", onResize);
     }, []);
 
+    const [allCustomers, setAllCustomers] = useState([]);
+
+    const knownLastNames = useMemo(() => {
+        const set = new Set();
+        allCustomers.forEach(c => {
+            const parts = (c.fullName || "").trim().split(/\s+/);
+            if (parts.length >= 2) set.add(parts[parts.length - 1]);
+        });
+        return [...set];
+    }, [allCustomers]);
+
     const fetchData = async () => {
         try {
             setLoading(true); setError("");
-            const [accRes, itemsRes, settingsRes, archRes] = await Promise.all([
+            const [accRes, itemsRes, settingsRes, archRes, custsRes] = await Promise.all([
                 api.get(`/accounts/customer/${customerId}/open`),
                 api.get("/items"),
                 api.get("/settings"),
                 api.get(`/accounts/customer/${customerId}/archived`),
+                api.get("/customers"),
             ]);
             setData(accRes.data);
             setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
             setSettings(settingsRes.data);
             setArchivedAccounts(Array.isArray(archRes.data) ? archRes.data : []);
+            setAllCustomers(Array.isArray(custsRes.data) ? custsRes.data : []);
         } catch (err) {
             setError(err.response?.data?.message || "שגיאה בטעינת הנתונים");
         } finally { setLoading(false); }
@@ -641,6 +736,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
             <style>{`
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
         .tx-row:hover { background:#fafafe !important; }
         .tx-row:hover .row-actions { opacity:1 !important; }
         .batch-row:hover .row-del { opacity:1 !important; }
@@ -672,8 +768,35 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
         }
       `}</style>
 
-            <EditCustomerModal open={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} customer={customer} onSaved={fetchData} />
+            <EditCustomerModal open={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} customer={customer} onSaved={fetchData} knownLastNames={knownLastNames} />
             <DeleteCustomerModal open={deleteCustomerOpen} onClose={() => setDeleteCustomerOpen(false)} customer={customer} stats={deleteStats} onDeleted={() => navigate("/customers")} />
+
+            {/* ── PIN Modal (before showing profit) ── */}
+            {pinOpen && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                    onClick={() => { setPinOpen(false); setPinCode(""); setPinError(""); }}>
+                    <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 300, padding: "28px 24px", direction: "rtl", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", animation: pinShake ? "shake 0.4s ease" : "fadeIn 0.2s ease" }}
+                        onClick={e => e.stopPropagation()}>
+                        <div style={{ width: 48, height: 48, borderRadius: 14, background: "#EEEDFE", color: "#534AB7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: 22 }}>🔒</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>אימות נדרש</div>
+                        <div style={{ fontSize: 12, color: "#aaa", marginBottom: 18 }}>הזן את קוד הנעילה לצפייה ברווח</div>
+                        <input
+                            autoFocus
+                            type="password"
+                            value={pinCode}
+                            onChange={e => { setPinCode(e.target.value); setPinError(""); }}
+                            onKeyDown={e => e.key === "Enter" && handlePinSubmit()}
+                            placeholder="• • • •"
+                            style={{ width: "100%", boxSizing: "border-box", border: `0.5px solid ${pinError ? "#F09595" : "#ddd"}`, borderRadius: 10, padding: "11px 14px", fontSize: 20, letterSpacing: "0.3em", color: "#1a1a1a", outline: "none", textAlign: "center", fontFamily: "inherit", marginBottom: pinError ? 8 : 16 }}
+                        />
+                        {pinError && <div style={{ background: "#FCEBEB", color: "#791F1F", border: "0.5px solid #F09595", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, marginBottom: 16 }}>{pinError}</div>}
+                        <button onClick={handlePinSubmit} disabled={pinLoading || !pinCode.trim()}
+                            style={{ width: "100%", background: "#534AB7", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: pinLoading || !pinCode.trim() ? "not-allowed" : "pointer", opacity: !pinCode.trim() ? 0.5 : 1 }}>
+                            {pinLoading ? "בודק..." : "אישור"}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Archive Prompt */}
             {showArchivePrompt && (
@@ -789,6 +912,9 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                         <button onClick={handlePrint} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: 120, background: "#fff", border: "0.5px solid #ddd", borderRadius: 9, padding: "8px 0", fontSize: 13, fontWeight: 600, color: "#555", cursor: "pointer", touchAction: "manipulation" }}>
                             {Icon.print} הדפס
                         </button>
+                        <button onClick={() => setPinOpen(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: 120, background: C.teal.bg, border: `0.5px solid ${C.teal.border}`, borderRadius: 9, padding: "8px 0", fontSize: 13, fontWeight: 600, color: C.teal.text, cursor: "pointer", touchAction: "manipulation" }}>
+                            💰 רווח
+                        </button>
                     </div>
                 </div>
 
@@ -853,6 +979,49 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                                 <StatCard label="סה״כ תשלומים" value={fmtCurrency(paymentsTotal)} icon={Icon.down} color={C.teal} />
                                 <StatCard label="עסקאות" value={transactions.length} icon={Icon.receipt} color={C.purple} />
                             </div>
+
+                            {/* ── Profit Modal ── */}
+                            {profitOpen && (() => {
+                                let totalProfit = 0;
+                                let counted = 0;
+                                transactions.forEach(t => {
+                                    if (t.type !== "debt") return;
+                                    const linkedItem = t.item
+                                        ? items.find(it => String(it._id) === String(t.item?._id || t.item))
+                                        : items.find(it => it.name === t.description);
+                                    if (linkedItem?.costPrice) {
+                                        const qty = Number(t.quantity || 1);
+                                        totalProfit += Number(t.amount || 0) - linkedItem.costPrice * qty;
+                                        counted++;
+                                    }
+                                });
+                                const isPositive = totalProfit >= 0;
+                                return (
+                                    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                                        onClick={() => setProfitOpen(false)}>
+                                        <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 320, padding: "28px 24px", direction: "rtl", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", animation: "fadeIn 0.2s ease" }}
+                                            onClick={e => e.stopPropagation()}>
+                                            <div style={{ width: 48, height: 48, borderRadius: 14, background: isPositive ? C.teal.bg : C.red.bg, color: isPositive ? C.teal.icon : C.red.icon, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22 }}>
+                                                {isPositive ? "↑" : "↓"}
+                                            </div>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: "#aaa", marginBottom: 6, letterSpacing: "0.05em" }}>
+                                                רווח מצטבר — {customer?.fullName || "לקוח"}
+                                            </div>
+                                            <div style={{ fontSize: 36, fontWeight: 800, color: isPositive ? C.teal.text : C.red.text, lineHeight: 1.1, marginBottom: 8 }}>
+                                                {isPositive ? "+" : ""}{fmtCurrency(totalProfit)}
+                                            </div>
+                                            {counted === 0 ? (
+                                                <div style={{ fontSize: 12, color: "#bbb", marginTop: 8 }}>אין פריטים עם מחיר עלות מוגדר</div>
+                                            ) : (
+                                                <div style={{ fontSize: 12, color: "#bbb" }}>מחושב מתוך {counted} עסקאות</div>
+                                            )}
+                                            <button onClick={() => setProfitOpen(false)} style={{ marginTop: 20, background: "#f5f5f5", border: "none", borderRadius: 9, padding: "9px 28px", fontSize: 13, fontWeight: 600, color: "#555", cursor: "pointer" }}>
+                                                סגור
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* ── Batch Add Form ── */}
                             <div className="form-wrap" style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "16px" }}>

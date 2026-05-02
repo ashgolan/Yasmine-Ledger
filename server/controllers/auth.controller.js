@@ -8,6 +8,34 @@ const cookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+// בדיקה אם קיים משתמש במערכת
+export const checkSetup = async (req, res) => {
+  const count = await User.countDocuments();
+  return res.json({ needsSetup: count === 0 });
+};
+
+// יצירת משתמש ראשון (רק אם אין משתמשים)
+export const register = async (req, res) => {
+  const count = await User.countDocuments();
+  if (count > 0) {
+    return res.status(403).json({ message: "המערכת כבר מוגדרת." });
+  }
+  const { username, password, lockCode } = req.body;
+  if (!username?.trim() || !password?.trim() || !lockCode?.trim()) {
+    return res.status(400).json({ message: "יש למלא את כל השדות." });
+  }
+  if (password.trim().length < 6) {
+    return res.status(400).json({ message: "הסיסמה חייבת להכיל לפחות 6 תווים." });
+  }
+  if (lockCode.trim().length < 4) {
+    return res.status(400).json({ message: "קוד הנעילה חייב להכיל לפחות 4 ספרות." });
+  }
+  const user = await User.create({ username: username.trim(), password: password.trim(), lockCode: lockCode.trim() });
+  const token = generateToken(user._id);
+  res.cookie("token", token, cookieOptions);
+  return res.status(201).json({ message: "המשתמש נוצר בהצלחה.", user: { _id: user._id, username: user.username } });
+};
+
 export const login = async (req, res) => {
   const { username, password } = req.body;
 

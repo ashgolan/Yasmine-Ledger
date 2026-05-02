@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/axios";
 
@@ -75,15 +75,31 @@ function Skeleton({ w, h, radius = 6 }) {
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
-function NewCustomerModal({ open, onClose, onSaved }) {
+function NewCustomerModal({ open, onClose, onSaved, existingCustomers = [] }) {
   const [form, setForm] = useState({ fullName: "", phone: "", idNumber: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const suggestionsRef = useRef(null);
+
+  // استخراج قائمة أسماء العائلات الفريدة من الزبائن الموجودين
+  const knownLastNames = useMemo(() => {
+    const set = new Set();
+    existingCustomers.forEach(c => {
+      const parts = (c.fullName || "").trim().split(/\s+/);
+      if (parts.length >= 2) set.add(parts[parts.length - 1]);
+    });
+    return [...set];
+  }, [existingCustomers]);
 
   const handleClose = () => {
     if (loading) return;
     setForm({ fullName: "", phone: "", idNumber: "" });
     setError("");
+    setSuggestions([]);
+    setShowSuggestions(false);
     onClose();
   };
 
@@ -97,11 +113,68 @@ function NewCustomerModal({ open, onClose, onSaved }) {
         idNumber: form.idNumber.trim(),
       });
       setForm({ fullName: "", phone: "", idNumber: "" });
+      setSuggestions([]);
       onSaved();
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה ביצירת לקוח");
     } finally { setLoading(false); }
+  };
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setForm({ ...form, fullName: val });
+    setActiveSuggestion(-1);
+
+    const parts = val.split(/\s+/);
+    // הצג הצעות רק כשמתחילים להקליד את מילה שנייה (שם משפחה)
+    if (parts.length >= 2 && parts[parts.length - 1].length >= 1) {
+      const lastPart = parts[parts.length - 1].toLowerCase();
+      const filtered = knownLastNames.filter(ln =>
+        ln.toLowerCase().startsWith(lastPart) && ln.toLowerCase() !== lastPart
+      );
+      setSuggestions(filtered.slice(0, 6));
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const applySuggestion = (lastName) => {
+    const parts = form.fullName.trim().split(/\s+/);
+    parts[parts.length - 1] = lastName;
+    setForm({ ...form, fullName: parts.join(" ") });
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setActiveSuggestion(-1);
+  };
+
+  const handleNameKeyDown = (e) => {
+    if (!showSuggestions) {
+      if (e.key === "Enter") handleSave();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestion(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestion(i => Math.max(i - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeSuggestion >= 0) {
+        applySuggestion(suggestions[activeSuggestion]);
+      } else {
+        handleSave();
+      }
+    } else if (e.key === "Escape") {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    } else if (e.key === "Tab" && activeSuggestion >= 0) {
+      e.preventDefault();
+      applySuggestion(suggestions[activeSuggestion]);
+    }
   };
 
   if (!open) return null;
@@ -137,10 +210,46 @@ function NewCustomerModal({ open, onClose, onSaved }) {
             <div style={{ position: "relative" }}>
               <div style={{ position: "absolute", top: "50%", right: 11, transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none" }}>{Icon.person}</div>
               <input autoFocus value={form.fullName}
-                onChange={e => setForm({ ...form, fullName: e.target.value })}
-                onKeyDown={e => e.key === "Enter" && handleSave()}
+                onChange={handleNameChange}
+                onKeyDown={handleNameKeyDown}
+                onBlur={() => setTimeout(() => { setSuggestions([]); setShowSuggestions(false); }, 150)}
                 placeholder="ישראל ישראלי"
-                style={fieldStyle} />
+                style={fieldStyle}
+                autoComplete="off"
+              />
+              {/* Autocomplete dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div ref={suggestionsRef} style={{
+                  position: "absolute", top: "calc(100% + 4px)", right: 0, left: 0, zIndex: 200,
+                  background: "#fff", border: "0.5px solid #e0ddf8", borderRadius: 10,
+                  boxShadow: "0 6px 24px rgba(83,74,183,0.10)", overflow: "hidden",
+                }}>
+                  <div style={{ padding: "6px 10px 4px", fontSize: 10, color: "#aaa", fontWeight: 600, borderBottom: "0.5px solid #f0f0f0", letterSpacing: "0.04em" }}>
+                    משפחות מוכרות
+                  </div>
+                  {suggestions.map((ln, idx) => {
+                    const parts = form.fullName.trim().split(/\s+/);
+                    const typed = parts[parts.length - 1];
+                    return (
+                      <div key={ln}
+                        onMouseDown={() => applySuggestion(ln)}
+                        style={{
+                          padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                          background: idx === activeSuggestion ? "#EEEDFE" : "transparent",
+                          color: idx === activeSuggestion ? "#3C3489" : "#1a1a1a",
+                          display: "flex", alignItems: "center", gap: 8,
+                          transition: "background 0.1s",
+                          fontWeight: idx === activeSuggestion ? 600 : 400,
+                        }}
+                        onMouseEnter={() => setActiveSuggestion(idx)}
+                      >
+                        <span style={{ color: "#534AB7", fontWeight: 700 }}>{ln.slice(0, typed.length)}</span>
+                        <span>{ln.slice(typed.length)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -349,7 +458,7 @@ export default function CustomersPage() {
         }
       `}</style>
 
-      <NewCustomerModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={fetchCustomers} />
+      <NewCustomerModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={fetchCustomers} existingCustomers={customers} />
 
       <div className="page-pad" style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
 
