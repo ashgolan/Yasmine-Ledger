@@ -33,7 +33,7 @@ export const addTransaction = async (req, res) => {
     account: account._id,
     customer: account.customer,
     type,
-    date,
+    date: new Date(date),
     item: item || null,
     description: description || "",
     quantity: quantity || 0,
@@ -43,7 +43,7 @@ export const addTransaction = async (req, res) => {
     createdBy: req.user._id,
   });
 
-  // 🔥 حساب الرصيد بعد الإضافة
+  // 🔥 חساب הרצד بعد الإضافة
   const transactions = await Transaction.find({
     account: account._id,
   });
@@ -60,7 +60,6 @@ export const addTransaction = async (req, res) => {
 
   if (balance === 0) {
     shouldAskArchive = true;
-
     account.zeroedAt = new Date();
     await account.save();
   }
@@ -86,12 +85,12 @@ export const updateTransaction = async (req, res) => {
     });
   }
 
-  transaction.type = type ?? transaction.type;
-  transaction.date = date ?? transaction.date;
+  transaction.type        = type        ?? transaction.type;
+  transaction.date        = date        ? new Date(date) : transaction.date;
   transaction.description = description ?? transaction.description;
-  transaction.quantity = quantity ?? transaction.quantity;
-  transaction.unitPrice = unitPrice ?? transaction.unitPrice;
-  transaction.amount = amount ?? transaction.amount;
+  transaction.quantity    = quantity    ?? transaction.quantity;
+  transaction.unitPrice   = unitPrice   ?? transaction.unitPrice;
+  transaction.amount      = amount      ?? transaction.amount;
 
   await transaction.save();
 
@@ -119,6 +118,7 @@ export const updateTransaction = async (req, res) => {
     balance,
   });
 };
+
 export const deleteTransaction = async (req, res) => {
   const { transactionId } = req.params;
 
