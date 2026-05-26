@@ -480,7 +480,9 @@ export default function AccountPage() {
       for (const row of valid) {
         lastRes = await api.post("/transactions", {
           accountId: data?.account?._id,
-          type: batchType, date: batchDate,
+          type: batchType, date: batchDate === today
+            ? new Date().toISOString()
+            : new Date(batchDate + "T12:00:00").toISOString(),
           description: row.description,
           quantity: Number(row.quantity || 0),
           unitPrice: Number(row.unitPrice || 0),

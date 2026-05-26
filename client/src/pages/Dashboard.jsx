@@ -5,18 +5,18 @@ import { api } from "../api/axios";
 // ─── Palette ────────────────────────────────────────────────────────────────
 const C = {
     purple: { bg: "#EEEDFE", border: "#AFA9EC", icon: "#534AB7", text: "#3C3489" },
-    red:    { bg: "#FCEBEB", border: "#F09595", icon: "#A32D2D", text: "#791F1F" },
-    amber:  { bg: "#FAEEDA", border: "#EF9F27", icon: "#854F0B", text: "#633806" },
-    teal:   { bg: "#E1F5EE", border: "#5DCAA5", icon: "#0F6E56", text: "#085041" },
-    blue:   { bg: "#E6F1FB", border: "#85B7EB", icon: "#185FA5", text: "#0C447C" },
-    pink:   { bg: "#FBEAF0", border: "#ED93B1", icon: "#993556", text: "#72243E" },
+    red: { bg: "#FCEBEB", border: "#F09595", icon: "#A32D2D", text: "#791F1F" },
+    amber: { bg: "#FAEEDA", border: "#EF9F27", icon: "#854F0B", text: "#633806" },
+    teal: { bg: "#E1F5EE", border: "#5DCAA5", icon: "#0F6E56", text: "#085041" },
+    blue: { bg: "#E6F1FB", border: "#85B7EB", icon: "#185FA5", text: "#0C447C" },
+    pink: { bg: "#FBEAF0", border: "#ED93B1", icon: "#993556", text: "#72243E" },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getTransactionType(type) {
-    if (type === "debt")    return { label: "חוב",    prefix: "+", color: C.red.text,   badge: C.red   };
-    if (type === "payment") return { label: "תשלום",  prefix: "−", color: C.teal.text,  badge: C.teal  };
-    if (type === "return")  return { label: "החזרה",  prefix: "−", color: C.amber.text, badge: C.amber };
+    if (type === "debt") return { label: "חוב", prefix: "+", color: C.red.text, badge: C.red };
+    if (type === "payment") return { label: "תשלום", prefix: "−", color: C.teal.text, badge: C.teal };
+    if (type === "return") return { label: "החזרה", prefix: "−", color: C.amber.text, badge: C.amber };
     return { label: type, prefix: "", color: "#333", badge: C.purple };
 }
 
@@ -30,19 +30,19 @@ function fmtCurrency(n) {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const Icon = {
-    wallet:    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5 4V3.5a3 3 0 016 0V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="11" cy="8.5" r="1" fill="currentColor"/></svg>,
-    people:    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M1 14c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M11 7c1.5 0 4 .8 4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-    archive:   <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 6l2-3h8l2 3" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6 9.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-    receipt:   <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 10l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    plus:      <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
-    doc:       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M6 6h4M6 9h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-    bookmark:  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h10v12l-5-3-5 3V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>,
-    settings:  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-    clock:     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    warn:      <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 13L8 3l5 10H3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 9V7M8 11v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-    analytics: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-    arrow:     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-    truck:     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M11 7h2.5L15 10v3h-4V7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><circle cx="4" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2"/><circle cx="12" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2"/></svg>,
+    wallet: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M5 4V3.5a3 3 0 016 0V4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><circle cx="11" cy="8.5" r="1" fill="currentColor" /></svg>,
+    people: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4" /><path d="M1 14c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M11 7c1.5 0 4 .8 4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+    archive: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M2 6l2-3h8l2 3" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><path d="M6 9.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+    receipt: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 10l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    plus: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
+    doc: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M6 6h4M6 9h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+    bookmark: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h10v12l-5-3-5 3V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>,
+    settings: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" /><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+    clock: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    warn: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 13L8 3l5 10H3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><path d="M8 9V7M8 11v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+    analytics: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 14h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
+    arrow: <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    truck: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><path d="M11 7h2.5L15 10v3h-4V7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><circle cx="4" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2" /><circle cx="12" cy="13.5" r="1.2" stroke="currentColor" strokeWidth="1.2" /></svg>,
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -226,12 +226,12 @@ export default function Dashboard() {
                 setLoading(true); setError("");
                 const res = await api.get("/dashboard/stats");
                 setStats({
-                    totalDebt:              Number(res.data?.totalDebt || 0),
-                    customersInDebtCount:   Number(res.data?.customersInDebtCount || 0),
-                    archivedAccountsCount:  Number(res.data?.archivedAccountsCount || 0),
+                    totalDebt: Number(res.data?.totalDebt || 0),
+                    customersInDebtCount: Number(res.data?.customersInDebtCount || 0),
+                    archivedAccountsCount: Number(res.data?.archivedAccountsCount || 0),
                     todayTransactionsCount: Number(res.data?.todayTransactionsCount || 0),
                     latestTransactions: Array.isArray(res.data?.latestTransactions) ? res.data.latestTransactions : [],
-                    topDebtors:         Array.isArray(res.data?.topDebtors)         ? res.data.topDebtors         : [],
+                    topDebtors: Array.isArray(res.data?.topDebtors) ? res.data.topDebtors : [],
                 });
             } catch (err) {
                 setError(err.response?.data?.message || "שגיאה בטעינת לוח הבקרה");
@@ -379,7 +379,7 @@ export default function Dashboard() {
                             {Icon.doc} הצעת מחיר
                         </button>
                         <button onClick={() => setExportModal(true)} disabled={exportLoading} style={{ display: "flex", alignItems: "center", gap: 6, background: "#0F6E56", color: "#E1F5EE", border: "none", borderRadius: 9, padding: "9px 16px", fontSize: 13, fontWeight: 600, cursor: exportLoading ? "not-allowed" : "pointer", opacity: exportLoading ? 0.7 : 1, touchAction: "manipulation", whiteSpace: "nowrap" }}>
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
                             {exportLoading ? "מייצא..." : "ייצוא"}
                         </button>
 
@@ -387,7 +387,7 @@ export default function Dashboard() {
                         <input ref={importFileRef} type="file" accept=".zip" onChange={handleImportSelect} style={{ display: "none" }} />
                         <button onClick={() => importFileRef.current?.click()}
                             style={{ display: "flex", alignItems: "center", gap: 6, background: C.teal.bg, border: `0.5px solid ${C.teal.border}`, borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: C.teal.text, cursor: "pointer", touchAction: "manipulation", whiteSpace: "nowrap" }}>
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 14V6M5 9l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 14V6M5 9l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
                             ייבוא גיבוי
                         </button>
 
@@ -430,12 +430,12 @@ export default function Dashboard() {
                                     <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 16 }}>הגיבוי שוחזר בהצלחה!</div>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
                                         {[
-                                            ["לקוחות",      importResult.restored?.customers],
-                                            ["חשבונות",     importResult.restored?.accounts],
-                                            ["עסקאות",      importResult.restored?.transactions],
-                                            ["פריטים",      importResult.restored?.items],
-                                            ["הצעות מחיר",  importResult.restored?.quotes],
-                                            ["תעודות משלוח",importResult.restored?.deliveryNotes],
+                                            ["לקוחות", importResult.restored?.customers],
+                                            ["חשבונות", importResult.restored?.accounts],
+                                            ["עסקאות", importResult.restored?.transactions],
+                                            ["פריטים", importResult.restored?.items],
+                                            ["הצעות מחיר", importResult.restored?.quotes],
+                                            ["תעודות משלוח", importResult.restored?.deliveryNotes],
                                         ].map(([label, count]) => (
                                             <div key={label} style={{ background: C.teal.bg, borderRadius: 10, padding: "10px", border: `0.5px solid ${C.teal.border}` }}>
                                                 <div style={{ fontSize: 18, fontWeight: 800, color: C.teal.text }}>{count ?? 0}</div>
@@ -459,12 +459,12 @@ export default function Dashboard() {
                                     <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>כיצד תרצה לייצא את נתוני הלקוחות?</div>
                                     {[
                                         { onClick: handleExportExcel, bg: "#E1F5EE", border: "#5DCAA5", iconBg: "#0F6E56", title: "ייצוא Excel", sub: "קובץ .xlsx מעוצב עם גיליונות", titleColor: "#085041", subColor: "#5DCAA5" },
-                                        { onClick: handleExportJson,  bg: "#EEEDFE", border: "#AFA9EC", iconBg: "#534AB7", title: "ייצוא JSON",  sub: "גיבוי מלא — מתאים לייבוא ל-DB",  titleColor: "#3C3489", subColor: "#AFA9EC" },
-                                        { onClick: handleExportBoth,  bg: "#FAEEDA", border: "#EF9F27", iconBg: "#854F0B", title: "ייצוא הכל",  sub: "הורדת Excel + JSON יחד",          titleColor: "#633806", subColor: "#EF9F27" },
+                                        { onClick: handleExportJson, bg: "#EEEDFE", border: "#AFA9EC", iconBg: "#534AB7", title: "ייצוא JSON", sub: "גיבוי מלא — מתאים לייבוא ל-DB", titleColor: "#3C3489", subColor: "#AFA9EC" },
+                                        { onClick: handleExportBoth, bg: "#FAEEDA", border: "#EF9F27", iconBg: "#854F0B", title: "ייצוא הכל", sub: "הורדת Excel + JSON יחד", titleColor: "#633806", subColor: "#EF9F27" },
                                     ].map(({ onClick, bg, border, iconBg, title, sub, titleColor, subColor }) => (
                                         <button key={title} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "12px 16px", cursor: "pointer", textAlign: "right" }}>
                                             <div style={{ width: 36, height: 36, borderRadius: 9, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" /></svg>
                                             </div>
                                             <div>
                                                 <div style={{ fontSize: 13, fontWeight: 600, color: titleColor }}>{title}</div>
@@ -484,27 +484,27 @@ export default function Dashboard() {
                 {/* ── Stat cards ── */}
                 {loading ? (
                     <div className="stats-grid">
-                        {[1,2,3,4].map(i => (
+                        {[1, 2, 3, 4].map(i => (
                             <div key={i} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14, padding: 18 }}>
-                                <Skeleton w="40%" h={14}/><div style={{marginTop:12}}><Skeleton w="70%" h={26}/></div><div style={{marginTop:8}}><Skeleton w="55%" h={11}/></div>
+                                <Skeleton w="40%" h={14} /><div style={{ marginTop: 12 }}><Skeleton w="70%" h={26} /></div><div style={{ marginTop: 8 }}><Skeleton w="55%" h={11} /></div>
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div className="stats-grid">
-                        <StatCard label="סך כל החובות"     value={`₪ ${Number(stats.totalDebt).toLocaleString("he-IL")}`}           sub="יתרת חוב פתוחה"  icon={Icon.wallet}  color={C.red}    barPct={72} />
-                        <StatCard label="לקוחות עם חוב"    value={Number(stats.customersInDebtCount).toLocaleString("he-IL")}        sub="חשבונות פתוחים"  icon={Icon.people}  color={C.purple} barPct={58} />
-                        <StatCard label="חשבונות בארכיון"  value={Number(stats.archivedAccountsCount).toLocaleString("he-IL")}       sub="הועברו לארכיון"  icon={Icon.archive} color={C.amber}  barPct={30} />
-                        <StatCard label="תנועות היום"       value={Number(stats.todayTransactionsCount).toLocaleString("he-IL")}      sub="נרשמו היום"      icon={Icon.receipt} color={C.teal}   barPct={45} />
+                        <StatCard label="סך כל החובות" value={`₪ ${Number(stats.totalDebt).toLocaleString("he-IL")}`} sub="יתרת חוב פתוחה" icon={Icon.wallet} color={C.red} barPct={72} />
+                        <StatCard label="לקוחות עם חוב" value={Number(stats.customersInDebtCount).toLocaleString("he-IL")} sub="חשבונות פתוחים" icon={Icon.people} color={C.purple} barPct={58} />
+                        <StatCard label="חשבונות בארכיון" value={Number(stats.archivedAccountsCount).toLocaleString("he-IL")} sub="הועברו לארכיון" icon={Icon.archive} color={C.amber} barPct={30} />
+                        <StatCard label="תנועות היום" value={Number(stats.todayTransactionsCount).toLocaleString("he-IL")} sub="נרשמו היום" icon={Icon.receipt} color={C.teal} barPct={45} />
                     </div>
                 )}
 
                 {/* ── Quick actions ── */}
                 <div className="actions-grid">
-                    <ActionCard label="ניהול לקוחות"      desc="צפייה והוספה"    icon={Icon.people}    color={C.purple} onClick={() => navigate("/customers")}      />
-                    <ActionCard label="פריטים"             desc="ניהול וחיפוש"   icon={Icon.doc}       color={C.blue}   onClick={() => navigate("/items")}          />
-                    <ActionCard label="הצעות מחיר"         desc="יצירה וניהול"   icon={Icon.bookmark}  color={C.pink}   onClick={() => navigate("/quotes")}         />
-                    <ActionCard label="דוחות ואנליטיקה"    desc="גרפים וניתוחים" icon={Icon.analytics} color={C.purple} onClick={() => navigate("/analytics")}      />
+                    <ActionCard label="ניהול לקוחות" desc="צפייה והוספה" icon={Icon.people} color={C.purple} onClick={() => navigate("/customers")} />
+                    <ActionCard label="פריטים" desc="ניהול וחיפוש" icon={Icon.doc} color={C.blue} onClick={() => navigate("/items")} />
+                    <ActionCard label="הצעות מחיר" desc="יצירה וניהול" icon={Icon.bookmark} color={C.pink} onClick={() => navigate("/quotes")} />
+                    <ActionCard label="דוחות ואנליטיקה" desc="גרפים וניתוחים" icon={Icon.analytics} color={C.purple} onClick={() => navigate("/analytics")} />
                 </div>
 
                 {/* ── Analytics Preview Strip ── */}
@@ -519,9 +519,9 @@ export default function Dashboard() {
                     <div className="bottom-grid">
                         {[6, 5].map((lines, i) => (
                             <div key={i} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 14, padding: 20 }}>
-                                <Skeleton w="35%" h={18}/>
+                                <Skeleton w="35%" h={18} />
                                 {Array.from({ length: lines }).map((_, j) => (
-                                    <div key={j} style={{ marginTop: 18 }}><Skeleton w="55%" h={14}/><div style={{marginTop:6}}><Skeleton w="35%" h={11}/></div></div>
+                                    <div key={j} style={{ marginTop: 18 }}><Skeleton w="55%" h={14} /><div style={{ marginTop: 6 }}><Skeleton w="35%" h={11} /></div></div>
                                 ))}
                             </div>
                         ))}
@@ -543,7 +543,10 @@ export default function Dashboard() {
                                             <div style={{ minWidth: 0, flex: 1 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.customerName}</div>
                                                 <div style={{ fontSize: 11, color: "#bbb", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {tx.date ? new Date(tx.date).toLocaleString("he-IL") : ""}
+                                                    {tx.date ? new Date(tx.date).toLocaleString("he-IL", {
+                                                        day: "2-digit", month: "2-digit", year: "numeric",
+                                                        hour: "2-digit", minute: "2-digit"
+                                                    }) : ""}
                                                     {tx.description ? ` · ${tx.description}` : ""}
                                                 </div>
                                             </div>
@@ -591,12 +594,12 @@ export default function Dashboard() {
                     <div style={{ background: "#fff", borderRadius: 18, padding: "28px 24px", width: 340, direction: "rtl", boxShadow: "0 12px 50px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: 14 }}>
                         <div style={{ display: "flex", justifyContent: "center" }}>
                             <div style={{ width: 56, height: 56, borderRadius: 16, background: "#EEEDFE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#534AB7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#534AB7" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="12" r="10" stroke="#AFA9EC" strokeWidth="1.2" strokeDasharray="3 3"/></svg>
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#534AB7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#534AB7" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="12" r="10" stroke="#AFA9EC" strokeWidth="1.2" strokeDasharray="3 3" /></svg>
                             </div>
                         </div>
                         <div style={{ textAlign: "center" }}>
                             <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 6 }}>תזכורת גיבוי שבועית</div>
-                            <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>עברה שבוע מאז הגיבוי האחרון.<br/>מומלץ לשמור עותק מעודכן של הנתונים שלך.</div>
+                            <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>עברה שבוע מאז הגיבוי האחרון.<br />מומלץ לשמור עותק מעודכן של הנתונים שלך.</div>
                         </div>
                         <div style={{ background: "#F5F6FA", borderRadius: 10, padding: "10px 14px", textAlign: "center", fontSize: 12, color: "#aaa" }}>
                             גיבוי אחרון: {(() => {
@@ -606,7 +609,7 @@ export default function Dashboard() {
                             })()}
                         </div>
                         <button onClick={handleBackupFromReminder} style={{ background: "#534AB7", color: "#fff", border: "none", borderRadius: 10, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v10M9 9l3 3 3-3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /></svg>
                             גבה עכשיו
                         </button>
                         <button onClick={() => setBackupReminderVisible(false)} style={{ background: "none", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 0", fontSize: 13, color: "#aaa", cursor: "pointer", fontWeight: 500 }}>
