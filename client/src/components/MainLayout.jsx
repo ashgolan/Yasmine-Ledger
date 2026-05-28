@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext";
 import GlobalSearch from "./GlobalSearch";
 import { useDarkMode } from "../App";
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
 const Icon = {
   dashboard: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" /></svg>,
   customers: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3" /><path d="M1 14c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><path d="M11 7c1.5 0 4 .8 4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
@@ -46,7 +45,6 @@ export default function MainLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const { dark, toggle } = useDarkMode();
 
-  // ── ألوان ديناميكية حسب الوضع ──
   const D = dark ? {
     pageBg:       "#0f1117",
     navBg:        "rgba(15,17,23,0.97)",
@@ -54,7 +52,6 @@ export default function MainLayout() {
     navText:      "#d4d6e0",
     navTextMuted: "#8b8fa8",
     btnBg:        "#1a1d27",
-    btnBgHover:   "#22253a",
     drawerBg:     "#1a1d27",
     drawerBorder: "#2a2d3a",
     drawerText:   "#d4d6e0",
@@ -63,7 +60,6 @@ export default function MainLayout() {
     bottomBorder: "#2a2d3a",
     searchBarBg:  "#1a1d27",
     toggleBg:     "#22253a",
-    toggleColor:  "#f5c842",
   } : {
     pageBg:       "#F5F6FA",
     navBg:        "rgba(255,255,255,0.97)",
@@ -71,7 +67,6 @@ export default function MainLayout() {
     navText:      "#1a1a1a",
     navTextMuted: "#aaa",
     btnBg:        "#f5f5f5",
-    btnBgHover:   "#ebebeb",
     drawerBg:     "#fff",
     drawerBorder: "#f0f0f0",
     drawerText:   "#444",
@@ -80,7 +75,6 @@ export default function MainLayout() {
     bottomBorder: "#e8e8e8",
     searchBarBg:  "#fff",
     toggleBg:     "#f5f5f5",
-    toggleColor:  "#555",
   };
 
   const isActive = (path) => {
@@ -102,7 +96,6 @@ export default function MainLayout() {
         .logout-btn:hover { background: #FCEBEB !important; color: #A32D2D !important; }
         .dark-toggle:hover { opacity: 0.85; }
 
-        /* ── Mobile drawer overlay ── */
         .drawer-overlay {
           position: fixed; inset: 0; z-index: 200;
           background: rgba(0,0,0,0.45);
@@ -110,7 +103,6 @@ export default function MainLayout() {
         }
         @keyframes fadeOverlay { from{opacity:0} to{opacity:1} }
 
-        /* ── Mobile drawer ── */
         .drawer {
           position: fixed; top: 0; right: 0; bottom: 0;
           width: 260px; z-index: 201;
@@ -121,7 +113,6 @@ export default function MainLayout() {
         }
         @keyframes slideDrawer { from{transform:translateX(100%)} to{transform:translateX(0)} }
 
-        /* ── Bottom nav ── */
         .bottom-nav {
           position: fixed; bottom: 0; right: 0; left: 0;
           z-index: 100;
@@ -132,11 +123,11 @@ export default function MainLayout() {
           padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* ── Responsive ── */
         @media (max-width: 768px) {
           .desktop-nav    { display: none !important; }
           .desktop-search { display: none !important; }
           .desktop-logout { display: none !important; }
+          .desktop-toggle { display: none !important; }
           .mobile-actions { display: flex !important; }
           .bottom-nav     { display: flex !important; }
           .page-content   { padding-bottom: 70px !important; }
@@ -146,7 +137,6 @@ export default function MainLayout() {
           .bottom-nav     { display: none !important; }
         }
 
-        /* ── Bottom nav button ── */
         .bottom-btn {
           flex: 1; display: flex; flex-direction: column;
           align-items: center; justify-content: center;
@@ -158,7 +148,6 @@ export default function MainLayout() {
         .bottom-btn.active { color: #534AB7; }
         .bottom-btn:not(.active):hover { color: ${dark ? "#d4d6e0" : "#555"}; }
 
-        /* ── Mobile search bar ── */
         .mobile-search-bar {
           position: fixed; top: 60px; right: 0; left: 0;
           z-index: 99;
@@ -236,8 +225,8 @@ export default function MainLayout() {
             {Icon.logout} יציאה
           </button>
 
-          {/* Dark Mode Toggle */}
-          <button className="dark-toggle" onClick={toggle}
+          {/* Dark Mode Toggle — desktop only */}
+          <button className="dark-toggle desktop-toggle" onClick={toggle}
             title={dark ? "מצב יום" : "מצב לילה"}
             style={{
               width: 36, height: 36, borderRadius: 9, border: "none",
@@ -252,7 +241,7 @@ export default function MainLayout() {
 
           {/* Mobile actions */}
           <div className="mobile-actions" style={{ marginRight: "auto", alignItems: "center", gap: 4 }}>
-            {/* Dark toggle — mobile */}
+            {/* Dark toggle — mobile only */}
             <button className="dark-toggle" onClick={toggle}
               style={{
                 width: 36, height: 36, borderRadius: 9, border: "none",
@@ -303,7 +292,6 @@ export default function MainLayout() {
           <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />
           <div className="drawer">
 
-            {/* Drawer header */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "16px 20px",
@@ -319,7 +307,6 @@ export default function MainLayout() {
               </button>
             </div>
 
-            {/* Drawer nav links */}
             <div style={{ flex: 1, padding: "12px", display: "flex", flexDirection: "column", gap: 4, overflowY: "auto" }}>
               {NAV.map(({ label, path, icon }) => {
                 const active = isActive(path);
@@ -345,7 +332,6 @@ export default function MainLayout() {
               })}
             </div>
 
-            {/* Drawer logout */}
             <div style={{ padding: "12px", borderTop: `0.5px solid ${D.drawerBorder}` }}>
               <button onClick={() => { logout(); setMenuOpen(false); }}
                 style={{
