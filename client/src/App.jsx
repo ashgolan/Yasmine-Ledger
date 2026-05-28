@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, createContext, useContext } from "react";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { CacheProvider } from "@emotion/react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -20,82 +20,122 @@ import { useAuth } from "./context/AuthContext";
 import DeliveryNotesPage from "./pages/DeliveryNotesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 
-function App() {
-  const [mode] = useState("light");
-  const [isLocked, setIsLocked] = useState(false);
+// ── Dark Mode Context ──────────────────────────────────────────────────────
+export const DarkModeContext = createContext({ dark: false, toggle: () => { } });
+export const useDarkMode = () => useContext(DarkModeContext);
 
+// ── Global dark mode styles ────────────────────────────────────────────────
+const darkStyles = `
+  /* نطبق الـ filter على الـ page-content فقط — مش على الـ navbar */
+.dm-page-content {
+  filter: invert(93%) hue-rotate(180deg);
+  transition: filter 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  will-change: filter;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+  /* الصور والإيموجي نعيدها للطبيعي */
+  .dm-page-content img,
+  .dm-page-content canvas,
+  .dm-page-content video {
+    filter: invert(93%) hue-rotate(180deg);
+  }
+  /* الـ modals والـ dropdowns خارج الـ page-content */
+  .dm-modal-root {
+    filter: invert(93%) hue-rotate(180deg);
+  }
+  .dm-modal-root img {
+    filter: invert(93%) hue-rotate(180deg);
+  }
+    
+`;
+
+function App() {
+  const [isLocked, setIsLocked] = useState(false);
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("yl-theme");
+    return saved === "dark"; // فقط لو المستخدم اختار dark يدوياً
+  });
   const { isAuthenticated, authLoading } = useAuth();
 
+  const mode = dark ? "dark" : "light";
   const theme = useMemo(() => getTheme(mode), [mode]);
   const cacheRtl = useMemo(() => createRtlCache(), []);
 
+  const toggleDark = () => setDark(d => !d);
+
+  // حفظ التفضيل
   useEffect(() => {
-    if (!isAuthenticated) {
-      setIsLocked(false);
-      return;
-    }
+    localStorage.setItem("yl-theme", dark ? "dark" : "light");
+    document.body.setAttribute("data-theme", dark ? "dark" : "light");
+  }, [dark]);
 
+  useEffect(() => {
+    if (!isAuthenticated) { setIsLocked(false); return; }
     let timeout;
-
     const resetTimer = () => {
       clearTimeout(timeout);
-
-      timeout = setTimeout(() => {
-        setIsLocked(true);
-      }, 60 * 1000);
+      timeout = setTimeout(() => setIsLocked(true), 60 * 1000);
     };
-
     const events = ["mousemove", "keydown", "click"];
-
-    events.forEach((event) => {
-      window.addEventListener(event, resetTimer);
-    });
-
+    events.forEach(e => window.addEventListener(e, resetTimer));
     resetTimer();
-
     return () => {
       clearTimeout(timeout);
-
-      events.forEach((event) => {
-        window.removeEventListener(event, resetTimer);
-      });
+      events.forEach(e => window.removeEventListener(e, resetTimer));
     };
   }, [isAuthenticated]);
 
   if (authLoading) {
-    return <div style={{ padding: 24 }}>טוען...</div>;
+    return (
+      <div style={{
+        padding: 24, minHeight: "100vh",
+        background: dark ? "#0f1117" : "#fff",
+        color: dark ? "#d4d6e0" : "#1a1a1a",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+      }}>
+        טוען...
+      </div>
+    );
   }
 
   return (
-    <CacheProvider value={cacheRtl}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          {isAuthenticated ? (
-            <>
-              <Routes>
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="customers" element={<CustomersPage />} />
-                  <Route path="account/:customerId" element={<AccountPage />} />
-                  <Route path="items" element={<ItemsPage />} />
-                  <Route path="quotes" element={<QuotesPage />} />
-                  <Route path="delivery-notes" element={<DeliveryNotesPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Routes>
+    <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
+      {/* inject dark mode styles */}
+      {dark && <style>{darkStyles}</style>}
 
-              {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} />}
-            </>
-          ) : (
-            <LoginPage />
-          )}
-        </BrowserRouter>
-      </ThemeProvider>
-    </CacheProvider>
+      <CacheProvider value={cacheRtl}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <BrowserRouter>
+            {isAuthenticated ? (
+              <>
+                <Routes>
+                  <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="customers" element={<CustomersPage />} />
+                    <Route path="account/:customerId" element={<AccountPage />} />
+                    <Route path="items" element={<ItemsPage />} />
+                    <Route path="quotes" element={<QuotesPage />} />
+                    <Route path="delivery-notes" element={<DeliveryNotesPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+                {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} />}
+              </>
+            ) : (
+              <LoginPage />
+            )}
+          </BrowserRouter>
+        </ThemeProvider>
+      </CacheProvider>
+    </DarkModeContext.Provider>
   );
 }
 

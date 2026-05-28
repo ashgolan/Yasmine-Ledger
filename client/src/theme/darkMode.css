@@ -1,0 +1,115 @@
+/* ── Dark Mode — Yasmine Ledger ─────────────────────────────────────────── */
+
+[data-theme="dark"] {
+    /* ── صفحة الخلفية ── */
+
+    [data-theme="dark"] img,
+    [data-theme="dark"] .emoji,
+    [data-theme="dark"] canvas {
+        filter: invert(93%) hue-rotate(180deg);
+    }
+
+    --dm-page-bg: #0f1117;
+    --dm-card-bg: #1a1d27;
+    --dm-card-border: #2a2d3a;
+    --dm-input-bg: #22253a;
+    --dm-input-border: #3a3d52;
+
+    /* ── نصوص — أبيض باهت مش فاقع ── */
+    --dm-text-primary: #d4d6e0;
+    /* النص الرئيسي — أبيض مائل للرمادي */
+    --dm-text-secondary: #8b8fa8;
+    /* النص الثانوي */
+    --dm-text-muted: #555870;
+    /* النص الخافت */
+
+    /* ── ألوان الحالة — أخف في الداركمود ── */
+    --dm-purple-bg: #1e1b3a;
+    --dm-purple-text: #a89fe0;
+    --dm-purple-icon: #7b6ed6;
+
+    --dm-red-bg: #2a1a1a;
+    --dm-red-text: #e08080;
+    --dm-red-icon: #c05050;
+
+    --dm-teal-bg: #0d2420;
+    --dm-teal-text: #5dbfa0;
+    --dm-teal-icon: #3a9e82;
+
+    --dm-amber-bg: #2a1e0a;
+    --dm-amber-text: #d4a050;
+    --dm-amber-icon: #b07830;
+
+    --dm-blue-bg: #0d1a2a;
+    --dm-blue-text: #6090c8;
+    --dm-blue-icon: #4070a8;
+}
+
+/* ── التطبيق الخارجي ── */
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+    background: var(--dm-page-bg) !important;
+    color: var(--dm-text-primary) !important;
+}
+
+/* ── الـ Navbar ── */
+[data-theme="dark"] .dm-navbar {
+    background: rgba(26, 29, 39, 0.97) !important;
+    border-bottom-color: var(--dm-card-border) !important;
+}
+
+/* ── كل البطاقات والكروت ── */
+[data-theme="dark"] .dm-card {
+    background: var(--dm-card-bg) !important;
+    border-color: var(--dm-card-border) !important;
+}
+
+/* ── الخلفية الرئيسية للصفحات ── */
+[data-theme="dark"] .dm-page {
+    background: var(--dm-page-bg) !important;
+}
+
+/* ── الـ inputs والـ selects ── */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="date"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: var(--dm-input-bg) !important;
+    border-color: var(--dm-input-border) !important;
+    color: var(--dm-text-primary) !important;
+}
+
+[data-theme="dark"] input[type="date"] {
+    background: var(--dm-input-bg) !important;
+    border-color: var(--dm-input-border) !important;
+    color: var(--dm-text-primary) !important;
+    color-scheme: dark;
+}
+
+/* ── الجداول ── */
+[data-theme="dark"] .dm-table-row {
+    background: var(--dm-card-bg) !important;
+    border-color: var(--dm-card-border) !important;
+}
+
+[data-theme="dark"] .dm-table-head {
+    background: #14172299 !important;
+}
+
+/* ── النصوص الثانوية ── */
+[data-theme="dark"] .dm-text-muted {
+    color: var(--dm-text-secondary) !important;
+}
+
+/* ── الـ Skeleton loader ── */
+[data-theme="dark"] .dm-skeleton {
+    background: linear-gradient(90deg, #22253a 25%, #2a2d45 50%, #22253a 75%) !important;
+}
+
+/* ── transition ناعم عند التبديل ── */
+*,
+*::before,
+*::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+}
