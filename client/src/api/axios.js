@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.PROD ? "/api" : "http://localhost:5000/api",
   withCredentials: true,
 });
 
@@ -10,7 +10,6 @@ api.interceptors.response.use(
   err => {
     if (err.response?.status === 401) {
       const url = err.config?.url || "";
-      // لا تعيد التوجيه عند login أو check-setup أو me
       if (
         !url.includes("/auth/login") &&
         !url.includes("/auth/check-setup") &&
