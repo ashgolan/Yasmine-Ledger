@@ -15,6 +15,6 @@ echo "🔨 Building client..."
 cd /var/www/yasmine-ledger/client && npm run build
 
 echo "🔄 Restarting server..."
-cd /var/www/yasmine-ledger/server && pm2 restart yasmine-ledger
+cd /var/www/yasmine-ledger/server && pm2 restart yasmine-ledger --update-env
 
 echo "✅ Deploy complete!"
