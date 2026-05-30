@@ -19,7 +19,7 @@ const createTransporter = () =>
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Google App Password
+      pass: process.env.EMAIL_PASS,
     },
   });
 
@@ -94,15 +94,14 @@ export function startWeeklyBackupJob() {
 
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !recipientEmail) {
     console.warn(
-      "⚠️  Weekly backup job DISABLED — missing EMAIL_USER / EMAIL_PASS / BACKUP_EMAIL in .env"
+      "⚠️  Daily backup job DISABLED — missing EMAIL_USER / EMAIL_PASS / BACKUP_EMAIL in .env"
     );
     return;
   }
 
-  // Every day at 08:00 Jerusalem time
-  // Format: second(optional) minute hour day-of-month month day-of-week
+  // Every day at 01:00 Jerusalem time
   cron.schedule(
-    "0 8 * * *",
+    "0 1 * * *",
     async () => {
       console.log("🔄 Daily backup job started...");
       try {
@@ -139,7 +138,7 @@ export function startWeeklyBackupJob() {
                   </tr>
                 </table>
                 <p style="color:#888;font-size:13px">
-                  הגיבוי נשלח אוטומטית כל יום בשעה 08:00.<br/>
+                  הגיבוי נשלח אוטומטית כל יום בשעה 01:00.<br/>
                   שמור את הקובץ במקום בטוח לשחזור עתידי.
                 </p>
               </div>
@@ -153,14 +152,14 @@ export function startWeeklyBackupJob() {
             ],
           });
 
-          console.log(`✅ Weekly backup sent to ${recipientEmail} (user: ${user.username})`);
+          console.log(`✅ Daily backup sent to ${recipientEmail} (user: ${user.username})`);
         }
       } catch (err) {
-        console.error("❌ Weekly backup job failed:", err.message);
+        console.error("❌ Daily backup job failed:", err.message);
       }
     },
     { timezone: "Asia/Jerusalem" }
   );
 
-  console.log("📅 Daily backup job scheduled — every day at 08:00 (Jerusalem)");
+  console.log("📅 Daily backup job scheduled — every day at 01:00 (Jerusalem)");
 }
