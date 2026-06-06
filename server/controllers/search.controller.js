@@ -1,17 +1,23 @@
 import Customer from "../models/Customer.js";
 import Transaction from "../models/Transaction.js";
 
+// ── מניעת ReDoS: בריחה מתווים מיוחדים לפני שימוש ב-Regex ──
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const globalSearch = async (req, res) => {
   try {
     const userId = req.user._id;
-    const q = String(req.query.q || "").trim();
+    const raw = String(req.query.q || "").trim();
 
-    if (!q) {
+    if (!raw) {
       return res.json({
         customers: [],
         transactions: [],
       });
     }
+
+    // הגבלת אורך החיפוש למניעת שאילתות כבדות
+    const q = escapeRegex(raw.slice(0, 100));
 
     const customers = await Customer.find({
       createdBy: userId,
@@ -57,7 +63,7 @@ export const globalSearch = async (req, res) => {
   } catch (error) {
     console.error("globalSearch error:", error);
     return res.status(500).json({
-      message: "Failed to search",
+      message: "שגיאה בחיפוש.",
     });
   }
 };

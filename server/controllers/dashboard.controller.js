@@ -7,6 +7,9 @@ import DeliveryNote from "../models/DeliveryNote.js";
 import Setting from "../models/Setting.js";
 import archiver from "archiver";
 import ExcelJS from "exceljs";
+import unzipper from "unzipper";
+import { Readable } from "stream";
+import Counter from "../models/Counter.js";
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -164,30 +167,29 @@ export const exportCustomersJson = async (req, res) => {
       storeName: setting.storeName || "", storePhone: setting.storePhone || "",
       storeAddress: setting.storeAddress || "", footerText: setting.footerText || "",
       logoBase64: setting.logoBase64 || "",
+      vatRate: setting.vatRate ?? 18,
       createdBy: String(setting.createdBy), createdAt: setting.createdAt, updatedAt: setting.updatedAt,
     } : null;
 
-    // ── UPDATED: أضفنا barcode + costPrice + profitMargin ──
     const itemsData = items.map((item) => ({
       _id: String(item._id),
       name: item.name,
       category: item.category || "",
-      costPrice: Number(item.costPrice || 0),       // ← NEW
-      profitMargin: Number(item.profitMargin || 0), // ← NEW
+      costPrice: Number(item.costPrice || 0),
+      profitMargin: Number(item.profitMargin || 0),
       price: Number(item.price || 0),
-      barcode: item.barcode || "",                  // ← NEW
+      barcode: item.barcode || "",
       note: item.note || "",
       isActive: item.isActive,
       createdBy: String(item.createdBy),
       createdAt: item.createdAt, updatedAt: item.updatedAt,
     }));
 
-    // ── UPDATED: أضفنا idNumber ──
     const customersData = customers.map((c) => ({
       _id: String(c._id),
       fullName: c.fullName,
       phone: c.phone || "",
-      idNumber: c.idNumber || "",  // ← NEW
+      idNumber: c.idNumber || "",
       note: c.note || "",
       isActive: c.isActive,
       createdBy: String(c.createdBy),
@@ -310,16 +312,14 @@ export const exportCustomersExcel = async (req, res) => {
 
     const workbook = new ExcelJS.Workbook();
 
-    // ── סיכום כללי — UPDATED: הוספנו עמודת ת.ז. ──
     const sumSheet = workbook.addWorksheet("סיכום כללי");
     sumSheet.views = [{ rightToLeft: true }];
     sumSheet.columns = [
-      { width: 24 }, { width: 16 }, { width: 14 },  // שם, טלפון, ת.ז.
-      { width: 14 }, { width: 14 }, { width: 14 },  // חובות, תשלומים, יתרה
-      { width: 14 }, { width: 14 },                  // עסקאות, תאריך
+      { width: 24 }, { width: 16 }, { width: 14 },
+      { width: 14 }, { width: 14 }, { width: 14 },
+      { width: 14 }, { width: 14 },
     ];
 
-    // ← UPDATED: הוספנו "ת.ז." כעמודה שלישית
     const sumHeaderRow = sumSheet.addRow(["שם לקוח", "טלפון", "ת.ז.", "חובות", "תשלומים", "יתרת חוב", "מס׳ עסקאות", "תאריך פתיחה"]);
     sumHeaderRow.height = 26;
     sumHeaderRow.eachCell((cell) =>
@@ -338,7 +338,6 @@ export const exportCustomersExcel = async (req, res) => {
       if (acc?.openedAt) { try { openedStr = new Date(acc.openedAt).toLocaleDateString("he-IL"); } catch (_) {} }
 
       const bg = idx % 2 === 0 ? WHITE_BG : STRIPE_BG;
-      // ← UPDATED: أضفنا c.idNumber في الموضع الثالث
       const row = sumSheet.addRow([c.fullName, c.phone || "—", c.idNumber || "—", debts, payments, balance, txs.length, openedStr]);
       row.height = 20;
       row.eachCell((cell, col) => {
@@ -351,7 +350,6 @@ export const exportCustomersExcel = async (req, res) => {
       });
     });
 
-    // ── שיט לכל לקוח — UPDATED: הוספנו ת.ז. בשורת הפרטים ──
     customers.forEach((c) => {
       const txs = txMap[String(c._id)] || [];
       const accList = accountMap[String(c._id)] || [];
@@ -369,10 +367,9 @@ export const exportCustomersExcel = async (req, res) => {
       styleCell(titleCell, { bgColor: HEADER_BG, fontColor: "FFFFFFFF", bold: true, align: "center", size: 12 });
       ws.getRow(1).height = 28;
 
-      // שורה 2: פרטי לקוח
       ws.getCell("A2").value = "שם לקוח:";
       ws.getCell("B2").value = c.fullName;
-      ws.getCell("C2").value = c.idNumber ? `ת.ז.: ${c.idNumber}` : "";  // ← NEW
+      ws.getCell("C2").value = c.idNumber ? `ת.ז.: ${c.idNumber}` : "";
       ws.getCell("D2").value = "טלפון:";
       ws.getCell("E2").value = c.phone || "—";
       ws.getCell("F2").value = "תאריך פתיחה:";
@@ -457,17 +454,12 @@ export const exportCustomersExcel = async (req, res) => {
 // ═══════════════════════════════════════════
 // import / restore backup
 // ═══════════════════════════════════════════
-import unzipper from "unzipper";
-import { Readable } from "stream";
-import Counter from "../models/Counter.js";
-
 export const importBackup = async (req, res) => {
   try {
     const userId = req.user._id;
 
     if (!req.file) return res.status(400).json({ message: "לא נמצא קובץ גיבוי" });
 
-    // ── קריאת ה-ZIP מהזיכרון ──
     const zipBuffer = req.file.buffer;
     const directory = await unzipper.Open.buffer(zipBuffer);
 
@@ -494,7 +486,7 @@ export const importBackup = async (req, res) => {
       return res.status(400).json({ message: "קובץ הגיבוי פגום או חסר קבצים חיוניים" });
     }
 
-    // ── מחיקת כל הנתונים הקיימים של המשתמש ──
+    // ── מחיקת נתונים קיימים ──
     await Promise.all([
       Customer.deleteMany({ createdBy: userId }),
       Account.deleteMany({ createdBy: userId }),
@@ -505,7 +497,6 @@ export const importBackup = async (req, res) => {
       Counter.deleteMany({}),
     ]);
 
-    // ── מיפוי _id ישן → חדש ──
     const customerIdMap = {};
     const accountIdMap  = {};
     const itemIdMap     = {};
@@ -515,120 +506,149 @@ export const importBackup = async (req, res) => {
     if (settings) {
       await Setting.findOneAndUpdate(
         { createdBy: userId },
-        { storeName: settings.storeName || "", storePhone: settings.storePhone || "",
-          storeAddress: settings.storeAddress || "", footerText: settings.footerText || "",
-          logoBase64: settings.logoBase64 || "",
-          createdBy: userId },
+        {
+          storeName:    settings.storeName    || "",
+          storePhone:   settings.storePhone   || "",
+          storeAddress: settings.storeAddress || "",
+          footerText:   settings.footerText   || "",
+          logoBase64:   settings.logoBase64   || "",
+          vatRate:      settings.vatRate      ?? 18,
+          createdBy:    userId,
+        },
         { upsert: true }
       );
     }
 
-    // 2. Items
+    // 2. Items — insertMany עם מיפוי IDs
     if (items?.length) {
-      for (const item of items) {
-        const oldId = item._id;
-        const created = await Item.create({
-          name: item.name, category: item.category || "",
-          costPrice: item.costPrice || 0, profitMargin: item.profitMargin || 0,
-          price: item.price || 0, barcode: item.barcode || "",
-          note: item.note || "", isActive: item.isActive ?? true,
-          createdBy: userId,
-        });
-        itemIdMap[oldId] = String(created._id);
-      }
-    }
-
-    // 3. Customers
-    for (const c of customers) {
-      const oldId = c._id;
-      const created = await Customer.create({
-        fullName: c.fullName, phone: c.phone || "",
-        idNumber: c.idNumber || "", note: c.note || "",
-        isActive: c.isActive ?? true, createdBy: userId,
+      const itemDocs = items.map(item => ({
+        name:         item.name,
+        category:     item.category     || "",
+        costPrice:    item.costPrice    || 0,
+        profitMargin: item.profitMargin || 0,
+        price:        item.price        || 0,
+        barcode:      item.barcode      || "",
+        note:         item.note         || "",
+        isActive:     item.isActive     ?? true,
+        createdBy:    userId,
+      }));
+      const createdItems = await Item.insertMany(itemDocs);
+      items.forEach((item, i) => {
+        itemIdMap[item._id] = String(createdItems[i]._id);
       });
-      customerIdMap[oldId] = String(created._id);
     }
 
-    // 4. Accounts
-    for (const acc of accounts) {
-      const oldId = acc._id;
-      const newCustomerId = customerIdMap[acc.customer];
-      if (!newCustomerId) continue;
-      const created = await Account.create({
-        customer: newCustomerId, status: acc.status,
-        openedAt: acc.openedAt, archivedAt: acc.archivedAt || null,
-        archiveNote: acc.archiveNote || "", zeroedAt: acc.zeroedAt || null,
+    // 3. Customers — insertMany עם מיפוי IDs
+    if (customers?.length) {
+      const customerDocs = customers.map(c => ({
+        fullName: c.fullName,
+        phone:    c.phone    || "",
+        idNumber: c.idNumber || "",
+        note:     c.note     || "",
+        isActive: c.isActive ?? true,
         createdBy: userId,
+      }));
+      const createdCustomers = await Customer.insertMany(customerDocs);
+      customers.forEach((c, i) => {
+        customerIdMap[c._id] = String(createdCustomers[i]._id);
       });
-      accountIdMap[oldId] = String(created._id);
     }
 
-    // 5. Transactions
-    if (transactions?.length) {
-      const txDocs = transactions.map(tx => ({
-        account:     accountIdMap[tx.account]  || null,
-        customer:    customerIdMap[tx.customer] || null,
-        type:        tx.type,
-        date:        tx.date,
-        item:        tx.item ? (itemIdMap[tx.item] || null) : null,
-        description: tx.description || "",
-        quantity:    tx.quantity || 0,
-        unitPrice:   tx.unitPrice || 0,
-        amount:      tx.amount || 0,
-        note:        tx.note || "",
+    // 4. Accounts — insertMany עם מיפוי IDs
+    if (accounts?.length) {
+      const validAccounts = accounts.filter(acc => customerIdMap[acc.customer]);
+      const accountDocs = validAccounts.map(acc => ({
+        customer:    customerIdMap[acc.customer],
+        status:      acc.status,
+        openedAt:    acc.openedAt,
+        archivedAt:  acc.archivedAt  || null,
+        archiveNote: acc.archiveNote || "",
+        zeroedAt:    acc.zeroedAt    || null,
         createdBy:   userId,
-      })).filter(tx => tx.account && tx.customer);
+      }));
+      const createdAccounts = await Account.insertMany(accountDocs);
+      validAccounts.forEach((acc, i) => {
+        accountIdMap[acc._id] = String(createdAccounts[i]._id);
+      });
+    }
+
+    // 5. Transactions — insertMany
+    if (transactions?.length) {
+      const txDocs = transactions
+        .map(tx => ({
+          account:     accountIdMap[tx.account]   || null,
+          customer:    customerIdMap[tx.customer]  || null,
+          type:        tx.type,
+          date:        tx.date,
+          item:        tx.item ? (itemIdMap[tx.item] || null) : null,
+          description: tx.description || "",
+          quantity:    tx.quantity    || 0,
+          unitPrice:   tx.unitPrice   || 0,
+          amount:      tx.amount      || 0,
+          note:        tx.note        || "",
+          createdBy:   userId,
+        }))
+        .filter(tx => tx.account && tx.customer);
       if (txDocs.length) await Transaction.insertMany(txDocs);
     }
 
-    // 6. Quotes
+    // 6. Quotes — insertMany עם מיפוי IDs
     if (quotes?.length) {
-      for (const q of quotes) {
-        const oldId = q._id;
-        const created = await Quote.create({
-          customer:      q.customer ? (customerIdMap[q.customer] || null) : null,
-          customerName:  q.customerName || "",
-          customerPhone: q.customerPhone || "",
-          quoteNumber:   q.quoteNumber,
-          date:          q.date,
-          status:        q.status || "draft",
-          items: (q.items || []).map(qi => ({
-            date: qi.date, description: qi.description || "",
-            quantity: qi.quantity || 0, unitPrice: qi.unitPrice || 0,
-            amount: qi.amount || 0, note: qi.note || "",
-            item: qi.item ? (itemIdMap[qi.item] || null) : null,
-          })),
-          total: q.total || 0, note: q.note || "",
-          convertedAt: q.convertedAt || null,
-          createdBy: userId,
-        });
-        quoteIdMap[oldId] = String(created._id);
-      }
+      const quoteDocs = quotes.map(q => ({
+        customer:      q.customer ? (customerIdMap[q.customer] || null) : null,
+        customerName:  q.customerName  || "",
+        customerPhone: q.customerPhone || "",
+        quoteNumber:   q.quoteNumber,
+        date:          q.date,
+        status:        q.status || "draft",
+        items: (q.items || []).map(qi => ({
+          date:        qi.date,
+          description: qi.description || "",
+          quantity:    qi.quantity    || 0,
+          unitPrice:   qi.unitPrice   || 0,
+          amount:      qi.amount      || 0,
+          note:        qi.note        || "",
+          item:        qi.item ? (itemIdMap[qi.item] || null) : null,
+        })),
+        total:       q.total || 0,
+        note:        q.note  || "",
+        convertedAt: q.convertedAt || null,
+        createdBy:   userId,
+      }));
+      const createdQuotes = await Quote.insertMany(quoteDocs);
+      quotes.forEach((q, i) => {
+        quoteIdMap[q._id] = String(createdQuotes[i]._id);
+      });
     }
 
-    // 7. Delivery Notes
+    // 7. Delivery Notes — insertMany
     if (deliveryNotes?.length) {
-      for (const dn of deliveryNotes) {
-        await DeliveryNote.create({
+      const dnDocs = deliveryNotes
+        .map(dn => ({
           customer:      customerIdMap[dn.customer] || null,
-          customerName:  dn.customerName || "",
+          customerName:  dn.customerName  || "",
           customerPhone: dn.customerPhone || "",
           noteNumber:    dn.noteNumber,
           date:          dn.date,
-          status:        dn.status || "open",
+          status:        dn.status || "draft",
           items: (dn.items || []).map(di => ({
-            date: di.date, description: di.description || "",
-            quantity: di.quantity || 0, unitPrice: di.unitPrice || 0,
-            amount: di.amount || 0, note: di.note || "",
-            item: di.item ? (itemIdMap[di.item] || null) : null,
+            date:        di.date,
+            description: di.description || "",
+            quantity:    di.quantity    || 0,
+            unitPrice:   di.unitPrice   || 0,
+            amount:      di.amount      || 0,
+            note:        di.note        || "",
+            item:        di.item ? (itemIdMap[di.item] || null) : null,
           })),
-          total: dn.total || 0, note: dn.note || "",
-          isDirty: dn.isDirty || false,
+          total:       dn.total   || 0,
+          note:        dn.note    || "",
+          isDirty:     dn.isDirty || false,
           convertedAt: dn.convertedAt || null,
           sourceQuote: dn.sourceQuote ? (quoteIdMap[dn.sourceQuote] || null) : null,
-          createdBy: userId,
-        });
-      }
+          createdBy:   userId,
+        }))
+        .filter(dn => dn.customer);
+      if (dnDocs.length) await DeliveryNote.insertMany(dnDocs);
     }
 
     // ── עדכון counters ──
@@ -636,10 +656,10 @@ export const importBackup = async (req, res) => {
       ? Math.max(...quotes.map(q => parseInt((q.quoteNumber || "Q-0000").split("-")[1]) || 0))
       : 0;
     const maxNote = deliveryNotes?.length
-      ? Math.max(...deliveryNotes.map(dn => parseInt(dn.noteNumber) || 0))
+      ? Math.max(...deliveryNotes.map(dn => parseInt((dn.noteNumber || "DN-0000").split("-")[1]) || 0))
       : 0;
-    if (maxQuote > 0) await Counter.findOneAndUpdate({ key: "quoteNumber" }, { seq: maxQuote }, { upsert: true });
-    if (maxNote  > 0) await Counter.findOneAndUpdate({ key: "noteNumber"  }, { seq: maxNote  }, { upsert: true });
+    if (maxQuote > 0) await Counter.findOneAndUpdate({ key: "quoteNumber" },        { seq: maxQuote }, { upsert: true });
+    if (maxNote  > 0) await Counter.findOneAndUpdate({ key: "deliveryNoteNumber" }, { seq: maxNote  }, { upsert: true });
 
     return res.json({
       message: "הגיבוי שוחזר בהצלחה",

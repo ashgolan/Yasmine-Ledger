@@ -1,4 +1,5 @@
 import rateLimit from "express-rate-limit";
+
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
@@ -23,5 +24,19 @@ export const authLimiter = rateLimit({
   },
   message: {
     message: "יותר מדי ניסיונות התחברות. נסה שוב בעוד 15 דקות.",
+  },
+});
+
+// ── הגנה על verify-lock-code מפני Brute-force ──
+// קוד 4 ספרות = 10,000 אפשרויות — חייב rate limit נפרד
+export const lockCodeLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 דקות
+  max: 8,                    // 8 ניסיונות בלבד
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method === "OPTIONS",
+  keyGenerator: (req) => req.ip,
+  message: {
+    message: "יותר מדי ניסיונות קוד נעילה. נסה שוב בעוד 10 דקות.",
   },
 });

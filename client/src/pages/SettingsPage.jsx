@@ -22,6 +22,7 @@ const Icon = {
     eye: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" /></svg>,
     eyeOff: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 2l12 12M6.5 6.6A2 2 0 0010 10M4 4.9C2.5 6 1 8 1 8s3 5 7 5c1.4 0 2.7-.5 3.8-1.2M7 3.1C7.3 3 7.7 3 8 3c4 0 7 5 7 5s-.7 1.2-2 2.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>,
     image: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><circle cx="5.5" cy="6.5" r="1" fill="currentColor" /><path d="M2 11l3-3 2.5 2.5L10 8l4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+    vat: <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13 3L3 13M5 4a1 1 0 100 2 1 1 0 000-2zM11 10a1 1 0 100 2 1 1 0 000-2z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
 };
 
 const inputStyleRtl = {
@@ -85,8 +86,12 @@ function SectionCard({ title, icon, color, children }) {
 }
 
 export default function SettingsPage() {
-    const [form, setForm] = useState({ storeName: "", storePhone: "", storeAddress: "", footerText: "" });
-    const [securityForm, setSecurityForm] = useState({ currentPassword: "", newPassword: "", confirmNewPassword: "", newLockCode: "", confirmNewLockCode: "" });
+    const [form, setForm] = useState({
+        storeName: "", storePhone: "", storeAddress: "", footerText: "", vatRate: 18,
+    });
+    const [securityForm, setSecurityForm] = useState({
+        currentPassword: "", newPassword: "", confirmNewPassword: "", newLockCode: "", confirmNewLockCode: "",
+    });
     const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
     const [loadingGeneral, setLoadingGeneral] = useState(false);
@@ -96,18 +101,18 @@ export default function SettingsPage() {
     useEffect(() => {
         api.get("/settings").then(res => {
             setForm({
-                storeName: res.data.storeName || "",
-                storePhone: res.data.storePhone || "",
+                storeName:    res.data.storeName    || "",
+                storePhone:   res.data.storePhone   || "",
                 storeAddress: res.data.storeAddress || "",
-                footerText: res.data.footerText || "",
+                footerText:   res.data.footerText   || "",
+                vatRate:      res.data.vatRate       ?? 18,
             });
             setLogoPreview(res.data.logoBase64 || "");
-
         }).catch(err => setError(err.response?.data?.message || "שגיאה בטעינת ההגדרות"));
     }, []);
 
     const showSuccess = (msg) => { setSuccess(msg); setError(""); setTimeout(() => setSuccess(""), 3000); };
-    const showError = (msg) => { setError(msg); setSuccess(""); };
+    const showError   = (msg) => { setError(msg); setSuccess(""); };
 
     const handleSave = async () => {
         try {
@@ -128,8 +133,8 @@ export default function SettingsPage() {
             setLoadingSecurity(true);
             const res = await api.put("/settings/security", {
                 currentPassword: securityForm.currentPassword,
-                newPassword: securityForm.newPassword,
-                newLockCode: securityForm.newLockCode,
+                newPassword:     securityForm.newPassword,
+                newLockCode:     securityForm.newLockCode,
             });
             showSuccess(res.data.message || "הגדרות האבטחה נשמרו בהצלחה");
             setSecurityForm({ currentPassword: "", newPassword: "", confirmNewPassword: "", newLockCode: "", confirmNewLockCode: "" });
@@ -149,7 +154,6 @@ export default function SettingsPage() {
         @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
         input:focus, textarea:focus { border-color: #AFA9EC !important; box-shadow: 0 0 0 3px #EEEDFE !important; outline: none; }
         textarea { resize: vertical; }
-
         @media (max-width: 540px) {
           .settings-header { padding: 14px 16px !important; }
           .settings-save-btn { width: 100% !important; justify-content: center !important; }
@@ -206,11 +210,25 @@ export default function SettingsPage() {
                         <textarea value={form.footerText} onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))} placeholder="לדוגמה: תודה על הקנייה!" rows={3}
                             style={{ ...inputStyleRtl, lineHeight: 1.6, paddingTop: 9 }} />
                     </Field>
+
+                    {/* ── VAT Rate ── */}
+                    <Field label='אחוז מע"מ' hint='יחושב אוטומטית בחשבוניות מס' icon={Icon.vat}>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={form.vatRate}
+                            onChange={e => setForm(f => ({ ...f, vatRate: Number(e.target.value) }))}
+                            placeholder="18"
+                            style={{ ...inputStyleRtl, paddingRight: 36, paddingLeft: 10 }}
+                        />
+                    </Field>
+
                     {/* ── Logo Field ── */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>לוגו העסק</label>
 
-                        {/* منطقة رفع الصورة */}
                         <div
                             onClick={() => document.getElementById("logo-upload").click()}
                             style={{
@@ -261,7 +279,6 @@ export default function SettingsPage() {
                             }}
                         />
 
-                        {/* معلومات وزر الحذف */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ fontSize: 11, color: "#bbb" }}>
                                 הלוגו יופיע בכל ההדפסות — חשבון לקוח, הצעת מחיר, תעודת משלוח
@@ -276,6 +293,7 @@ export default function SettingsPage() {
                             )}
                         </div>
                     </div>
+
                     <button className="settings-save-btn" onClick={handleSave} disabled={loadingGeneral} style={{
                         display: "flex", alignItems: "center", gap: 6,
                         background: "#534AB7", color: "#fff", border: "none",
