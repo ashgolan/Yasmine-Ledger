@@ -211,9 +211,29 @@ export default function LoginPage() {
               </button>
             </form>
 
+            {/* Copyright */}
             <div style={{ marginTop: 28, textAlign: "center", fontSize: 11, color: "#ccc" }}>
               Yasmine Ledger · כל הזכויות שמורות
             </div>
+
+            {/* A.Shaalan Tech signature */}
+            <div style={{ textAlign: "center", marginTop: 16, paddingBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "#bbb", marginBottom: 6, letterSpacing: "0.06em" }}>
+                פותח ועוצב על ידי
+              </div>
+              <img
+                src="/ashaalan-tech-gold.png"
+                alt="A.Shaalan Tech"
+                style={{
+                  height: 60,
+                  width: "auto",
+                  display: "inline-block",
+                  borderRadius: 8,
+                  opacity: 0.9,
+                }}
+              />
+            </div>
+
           </div>
         )}
       </div>
