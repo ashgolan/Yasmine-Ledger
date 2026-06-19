@@ -43,6 +43,6 @@ jobs:
           script: |
             cd /var/www/yasmine-ledger
             git fetch origin main && git reset --hard origin/main
-            cd client && npm install && npm run build
+            cd client && npm install && bash build.sh
             cd ../server && npm install && pm2 restart yasmine-ledger --update-env
             echo "✅ Deploy completed (retry)!"
