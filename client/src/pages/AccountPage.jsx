@@ -1112,8 +1112,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: card.iconBg, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{Icon.wallet}</div>
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 600, color: card.numColor, textTransform: "uppercase", marginBottom: 2 }}>יתרת חוב</div>
-                        <div className="balance-amount" style={{ fontSize: 28, fontWeight: 800, color: card.numColor, lineHeight: 1 }}>{fmtCurrency(balance)}</div>
-                      </div>
+                        <div className="balance-amount" style={{ fontSize: 32, fontWeight: 600, color: card.numColor, lineHeight: 1 }}>{fmtCurrency(balance)}</div>                      </div>
                     </div>
                     <div style={{ background: card.badgeBg, color: "#fff", borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>{card.label}</div>
                   </div>
