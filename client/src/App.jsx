@@ -20,44 +20,29 @@ import { useAuth } from "./context/AuthContext";
 import DeliveryNotesPage from "./pages/DeliveryNotesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 
-// ── Dark Mode Context ──────────────────────────────────────────────────────
 export const DarkModeContext = createContext({ dark: false, toggle: () => { } });
 export const useDarkMode = () => useContext(DarkModeContext);
 
-// ── Global dark mode styles ────────────────────────────────────────────────
 const darkStyles = `
-  /* نطبق الـ filter على الـ page-content فقط — مش على الـ navbar */
-.dm-page-content {
-  filter: invert(93%) hue-rotate(180deg);
-  transition: filter 0.2s ease;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  will-change: filter;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-  /* الصور والإيموجي نعيدها للطبيعي */
+  .dm-page-content {
+    filter: invert(93%) hue-rotate(180deg);
+    transition: filter 0.2s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    will-change: filter;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
   .dm-page-content img,
   .dm-page-content canvas,
-  .dm-page-content video {
-    filter: invert(93%) hue-rotate(180deg);
-  }
-  /* الـ modals والـ dropdowns خارج الـ page-content */
-  .dm-modal-root {
-    filter: invert(93%) hue-rotate(180deg);
-  }
-  .dm-modal-root img {
-    filter: invert(93%) hue-rotate(180deg);
-  }
-    
+  .dm-page-content video { filter: invert(93%) hue-rotate(180deg); }
+  .dm-modal-root { filter: invert(93%) hue-rotate(180deg); }
+  .dm-modal-root img { filter: invert(93%) hue-rotate(180deg); }
 `;
 
 function App() {
   const [isLocked, setIsLocked] = useState(false);
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem("yl-theme");
-    return saved === "dark"; // فقط لو المستخدم اختار dark يدوياً
-  });
+  const [dark, setDark] = useState(() => localStorage.getItem("yl-theme") === "dark");
   const { isAuthenticated, authLoading } = useAuth();
 
   const mode = dark ? "dark" : "light";
@@ -66,7 +51,6 @@ function App() {
 
   const toggleDark = () => setDark(d => !d);
 
-  // حفظ التفضيل
   useEffect(() => {
     localStorage.setItem("yl-theme", dark ? "dark" : "light");
     document.body.setAttribute("data-theme", dark ? "dark" : "light");
@@ -79,7 +63,7 @@ function App() {
       clearTimeout(timeout);
       timeout = setTimeout(() => setIsLocked(true), 60 * 1000);
     };
-    const events = ["mousemove", "keydown", "click"];
+    const events = ["mousemove", "keydown", "click", "touchstart"];
     events.forEach(e => window.addEventListener(e, resetTimer));
     resetTimer();
     return () => {
@@ -102,33 +86,38 @@ function App() {
     );
   }
 
+  // ✅ إذا مقفل — اعرض LockScreen فقط بدون التطبيق في الخلف
+  if (isAuthenticated && isLocked) {
+    return (
+      <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
+        {dark && <style>{darkStyles}</style>}
+        <LockScreen onUnlock={() => setIsLocked(false)} />
+      </DarkModeContext.Provider>
+    );
+  }
+
   return (
     <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
-      {/* inject dark mode styles */}
       {dark && <style>{darkStyles}</style>}
-
       <CacheProvider value={cacheRtl}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <BrowserRouter>
             {isAuthenticated ? (
-              <>
-                <Routes>
-                  <Route path="/" element={<MainLayout />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="customers" element={<CustomersPage />} />
-                    <Route path="account/:customerId" element={<AccountPage />} />
-                    <Route path="items" element={<ItemsPage />} />
-                    <Route path="quotes" element={<QuotesPage />} />
-                    <Route path="delivery-notes" element={<DeliveryNotesPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Route>
-                </Routes>
-                {isLocked && <LockScreen onUnlock={() => setIsLocked(false)} />}
-              </>
+              <Routes>
+                <Route path="/" element={<MainLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="customers" element={<CustomersPage />} />
+                  <Route path="account/:customerId" element={<AccountPage />} />
+                  <Route path="items" element={<ItemsPage />} />
+                  <Route path="quotes" element={<QuotesPage />} />
+                  <Route path="delivery-notes" element={<DeliveryNotesPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
             ) : (
               <LoginPage />
             )}
