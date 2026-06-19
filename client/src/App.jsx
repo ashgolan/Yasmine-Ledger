@@ -40,8 +40,10 @@ const darkStyles = `
   .dm-modal-root img { filter: invert(93%) hue-rotate(180deg); }
 `;
 
+const LOCK_KEY = "yl-screen-locked";
+
 function App() {
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLocked, setIsLocked] = useState(() => localStorage.getItem(LOCK_KEY) === "true");
   const [dark, setDark] = useState(() => localStorage.getItem("yl-theme") === "dark");
   const { isAuthenticated, authLoading } = useAuth();
 
@@ -57,11 +59,20 @@ function App() {
   }, [dark]);
 
   useEffect(() => {
-    if (!isAuthenticated) { setIsLocked(false); return; }
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      localStorage.removeItem(LOCK_KEY);
+      setIsLocked(false);
+      return;
+    }
     let timeout;
+    const lock = () => {
+      localStorage.setItem(LOCK_KEY, "true");
+      setIsLocked(true);
+    };
     const resetTimer = () => {
       clearTimeout(timeout);
-      timeout = setTimeout(() => setIsLocked(true), 60 * 1000);
+      timeout = setTimeout(lock, 60 * 1000);
     };
     const events = ["mousemove", "keydown", "click", "touchstart"];
     events.forEach(e => window.addEventListener(e, resetTimer));
@@ -70,10 +81,29 @@ function App() {
       clearTimeout(timeout);
       events.forEach(e => window.removeEventListener(e, resetTimer));
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
+  const handleUnlock = () => {
+    localStorage.removeItem(LOCK_KEY);
+    setIsLocked(false);
+  };
+
+  const darkWrapper = (children) => (
+    <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
+      {dark && <style>{darkStyles}</style>}
+      {children}
+    </DarkModeContext.Provider>
+  );
+
+  // ✅ الأولوية القصوى: إذا localStorage يقول مقفل → اعرض LockScreen فوراً
+  // حتى لو authLoading=true — لا نسمح بأي تجاوز بـ F5
+  if (isLocked) {
+    return darkWrapper(<LockScreen onUnlock={handleUnlock} />);
+  }
+
+  // انتظر التحقق من الجلسة فقط إذا لم يكن مقفلاً
   if (authLoading) {
-    return (
+    return darkWrapper(
       <div style={{
         padding: 24, minHeight: "100vh",
         background: dark ? "#0f1117" : "#fff",
@@ -86,45 +116,32 @@ function App() {
     );
   }
 
-  // ✅ إذا مقفل — اعرض LockScreen فقط بدون التطبيق في الخلف
-  if (isAuthenticated && isLocked) {
-    return (
-      <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
-        {dark && <style>{darkStyles}</style>}
-        <LockScreen onUnlock={() => setIsLocked(false)} />
-      </DarkModeContext.Provider>
-    );
-  }
-
-  return (
-    <DarkModeContext.Provider value={{ dark, toggle: toggleDark }}>
-      {dark && <style>{darkStyles}</style>}
-      <CacheProvider value={cacheRtl}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <BrowserRouter>
-            {isAuthenticated ? (
-              <Routes>
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="customers" element={<CustomersPage />} />
-                  <Route path="account/:customerId" element={<AccountPage />} />
-                  <Route path="items" element={<ItemsPage />} />
-                  <Route path="quotes" element={<QuotesPage />} />
-                  <Route path="delivery-notes" element={<DeliveryNotesPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Routes>
-            ) : (
-              <LoginPage />
-            )}
-          </BrowserRouter>
-        </ThemeProvider>
-      </CacheProvider>
-    </DarkModeContext.Provider>
+  return darkWrapper(
+    <CacheProvider value={cacheRtl}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <BrowserRouter>
+          {isAuthenticated ? (
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="customers" element={<CustomersPage />} />
+                <Route path="account/:customerId" element={<AccountPage />} />
+                <Route path="items" element={<ItemsPage />} />
+                <Route path="quotes" element={<QuotesPage />} />
+                <Route path="delivery-notes" element={<DeliveryNotesPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          ) : (
+            <LoginPage />
+          )}
+        </BrowserRouter>
+      </ThemeProvider>
+    </CacheProvider>
   );
 }
 
