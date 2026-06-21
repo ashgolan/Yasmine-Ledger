@@ -117,7 +117,7 @@ export function startWeeklyBackupJob() {
           await transporter.sendMail({
             from: `"Yasmine Ledger" <${process.env.EMAIL_USER}>`,
             to: recipientEmail,
-            subject: `📦 גיבוי יומי אוטומטי — ${dateStr}`,
+            subject: `📦 גיבוי אוטומטי — Yasmine Ledger | ${dateStr}`,
             html: `
               <div dir="rtl" style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
                 <h2 style="color:#534AB7">גיבוי יומי אוטומטי ✅</h2>
