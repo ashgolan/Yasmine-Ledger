@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { api } from "../api/axios";
+import { useDarkMode } from "../App";
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -76,6 +78,7 @@ function Skeleton({ w, h, radius = 6 }) {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function NewCustomerModal({ open, onClose, onSaved, existingCustomers = [] }) {
+  const { dark } = useDarkMode();
   const [form, setForm] = useState({ fullName: "", phone: "", idNumber: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,14 +110,15 @@ function NewCustomerModal({ open, onClose, onSaved, existingCustomers = [] }) {
     if (!form.fullName.trim()) { setError("יש להזין שם לקוח"); return; }
     try {
       setLoading(true); setError("");
-      await api.post("/customers", {
+      const res = await api.post("/customers", {
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
         idNumber: form.idNumber.trim(),
       });
       setForm({ fullName: "", phone: "", idNumber: "" });
       setSuggestions([]);
-      onSaved();
+      // נשלח את הלקוח החדש שחזר מהשרת כדי שהדף הראשי יוכל לנווט אליו ישירות
+      onSaved(res.data);
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה ביצירת לקוח");
@@ -186,8 +190,13 @@ function NewCustomerModal({ open, onClose, onSaved, existingCustomers = [] }) {
     fontSize: 13, color: "#1a1a1a", outline: "none", fontFamily: "inherit",
   };
 
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+  // Rendered via portal directly into document.body so it always centers
+  // relative to the real viewport — independent of any ancestor (like the
+  // dark-mode `.dm-page-content` filter wrapper) that would otherwise create
+  // a new containing block for `position: fixed`. The same `dm-page-content`
+  // class is applied here so the dark-mode color inversion still applies.
+  return createPortal(
+    <div className={dark ? "dm-page-content" : ""} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={handleClose}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 420, padding: "24px 20px", direction: "rtl" }}
         onClick={e => e.stopPropagation()}>
@@ -296,7 +305,8 @@ function NewCustomerModal({ open, onClose, onSaved, existingCustomers = [] }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -424,6 +434,15 @@ export default function CustomersPage() {
 
   useEffect(() => { fetchCustomers(); }, []);
 
+  // נקרא אחרי יצירת לקוח חדש במודל — מרענן את הרשימה ברקע
+  // ומיד עובר לדף החשבון של הלקוח החדש, כדי שאפשר להתחיל
+  // להזין עסקאות מיד בלי לחפש אותו ברשימה.
+  const handleCustomerCreated = (newCustomer) => {
+    fetchCustomers();
+    const newId = newCustomer?._id || newCustomer?.customer?._id;
+    if (newId) navigate(`/account/${newId}`);
+  };
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return customers;
@@ -458,7 +477,7 @@ export default function CustomersPage() {
         }
       `}</style>
 
-      <NewCustomerModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={fetchCustomers} existingCustomers={customers} />
+      <NewCustomerModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={handleCustomerCreated} existingCustomers={customers} />
 
       <div className="page-pad" style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12 }}>
 

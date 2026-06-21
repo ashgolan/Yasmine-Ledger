@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { api } from "../api/axios";
+import { useDarkMode } from "../App";
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const C = {
@@ -189,6 +191,7 @@ function AnalyticsStrip({ data, loading, onNavigate }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
     const navigate = useNavigate();
+    const { dark } = useDarkMode();
     const [loading, setLoading] = useState(true);
     const [analyticsLoading, setAnalyticsLoading] = useState(true);
     const [stats, setStats] = useState({
@@ -392,8 +395,8 @@ export default function Dashboard() {
                         </button>
 
                         {/* ── Import Confirm Modal ── */}
-                        {importModal && (
-                            <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                        {importModal && createPortal(
+                            <div className={dark ? "dm-page-content" : ""} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
                                 onClick={() => { setImportModal(false); setImportFile(null); }}>
                                 <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 360, padding: "28px 24px", direction: "rtl", boxShadow: "0 24px 60px rgba(0,0,0,0.2)" }}
                                     onClick={e => e.stopPropagation()}>
@@ -419,12 +422,13 @@ export default function Dashboard() {
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </div>,
+                            document.body
                         )}
 
                         {/* ── Import Success Modal ── */}
-                        {importResult && (
-                            <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                        {importResult && createPortal(
+                            <div className={dark ? "dm-page-content" : ""} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
                                 <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 360, padding: "28px 24px", direction: "rtl", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", textAlign: "center" }}>
                                     <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
                                     <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 16 }}>הגיבוי שוחזר בהצלחה!</div>
@@ -448,12 +452,13 @@ export default function Dashboard() {
                                         סיום — רענן את הדף
                                     </button>
                                 </div>
-                            </div>
+                            </div>,
+                            document.body
                         )}
 
                         {/* Export Modal */}
-                        {exportModal && (
-                            <div onClick={() => setExportModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {exportModal && createPortal(
+                            <div onClick={() => setExportModal(false)} className={dark ? "dm-page-content" : ""} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                 <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: "28px 24px", width: 320, direction: "rtl", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: 12 }}>
                                     <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>בחר פורמט ייצוא</div>
                                     <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>כיצד תרצה לייצא את נתוני הלקוחות?</div>
@@ -474,7 +479,8 @@ export default function Dashboard() {
                                     ))}
                                     <button onClick={() => setExportModal(false)} style={{ marginTop: 4, background: "none", border: "none", color: "#aaa", fontSize: 13, cursor: "pointer", padding: "6px 0" }}>ביטול</button>
                                 </div>
-                            </div>
+                            </div>,
+                            document.body
                         )}
                     </div>
                 </div>
@@ -589,8 +595,8 @@ export default function Dashboard() {
             </div>
 
             {/* ── Backup Reminder Modal ── */}
-            {backupReminderVisible && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {backupReminderVisible && createPortal(
+                <div className={dark ? "dm-page-content" : ""} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ background: "#fff", borderRadius: 18, padding: "28px 24px", width: 340, direction: "rtl", boxShadow: "0 12px 50px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: 14 }}>
                         <div style={{ display: "flex", justifyContent: "center" }}>
                             <div style={{ width: 56, height: 56, borderRadius: 16, background: "#EEEDFE", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -616,7 +622,8 @@ export default function Dashboard() {
                             תזכיר לי מאוחר יותר
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

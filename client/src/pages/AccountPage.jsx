@@ -393,9 +393,14 @@ export default function AccountPage() {
     return [...set];
   }, [allCustomers]);
 
-  const fetchData = async () => {
+  // isInitial=true בקריאה הראשונה בלבד (פתיחת הדף) — אז מציגים את מסך
+  // ה"טוען..." המלא. כל קריאה חוזרת (אחרי הוספה/עריכה/מחיקה/ארכוב) נשלחת
+  // עם isInitial=false כדי שלא ימחק את כל הממשק ויחזיר ספינר — הנתונים
+  // פשוט מתעדכנים "בשקט" מתחת לממשק הקיים, כמו אפליקציית עמוד יחיד אמיתית.
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true); setError("");
+      if (isInitial) setLoading(true);
+      setError("");
       const [accRes, itemsRes, settingsRes, archRes, custsRes] = await Promise.all([
         api.get(`/accounts/customer/${customerId}/open`),
         api.get("/items"),
@@ -410,10 +415,12 @@ export default function AccountPage() {
       setAllCustomers(Array.isArray(custsRes.data) ? custsRes.data : []);
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה בטעינת הנתונים");
-    } finally { setLoading(false); }
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   };
 
-  useEffect(() => { if (customerId) fetchData(); }, [customerId]);
+  useEffect(() => { if (customerId) fetchData(true); }, [customerId]);
 
   // ── ADDED: Global barcode listener ──
   useEffect(() => {
