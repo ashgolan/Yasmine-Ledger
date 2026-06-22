@@ -15,14 +15,12 @@ function fmtCurrency(n) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(Number(n || 0));
 }
 
-// חישוב מחיר מכירה ממחיר עלות + אחוז רווח
 function calcSellPrice(cost, margin) {
   const c = Number(cost || 0), m = Number(margin || 0);
   if (!c) return "";
   return String(Math.round(c * (1 + m / 100)));
 }
 
-// חישוב אחוז רווח ממחיר עלות + מחיר מכירה
 function calcMargin(cost, sell) {
   const c = Number(cost || 0), s = Number(sell || 0);
   if (!c || !s) return "";
@@ -58,7 +56,7 @@ const inputStyle = {
 };
 
 // ─── Modal פריט חדש / עריכה ──────────────────────────────────────────────────
-function ItemModal({ open, onClose, onSaved, editItem = null }) {
+function ItemModal({ open, onClose, onSaved, editItem = null, knownCategories = [] }) {
   const [form, setForm] = useState({ name: "", category: "", costPrice: "", profitMargin: "", price: "", barcode: "", note: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -66,6 +64,11 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
   const barcodeRef = useRef();
   const scanBuffer = useRef("");
   const scanTimer = useRef(null);
+
+  // ── Category autocomplete state ──
+  const [catSuggestions, setCatSuggestions] = useState([]);
+  const [showCatSuggestions, setShowCatSuggestions] = useState(false);
+  const [activeCatIdx, setActiveCatIdx] = useState(-1);
 
   useEffect(() => {
     if (editItem) {
@@ -82,12 +85,54 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
       setForm({ name: "", category: "", costPrice: "", profitMargin: "", price: "", barcode: "", note: "" });
     }
     setError(""); setScanMode(false);
+    setCatSuggestions([]); setShowCatSuggestions(false); setActiveCatIdx(-1);
   }, [editItem, open]);
 
   const handleClose = () => {
     if (loading) return;
     setForm({ name: "", category: "", costPrice: "", profitMargin: "", price: "", barcode: "", note: "" });
-    setError(""); setScanMode(false); onClose();
+    setError(""); setScanMode(false);
+    setCatSuggestions([]); setShowCatSuggestions(false);
+    onClose();
+  };
+
+  // ── Category input with autocomplete ──
+  const handleCategoryChange = (val) => {
+    setForm(f => ({ ...f, category: val }));
+    setActiveCatIdx(-1);
+    if (val.trim().length >= 1) {
+      const q = val.trim().toLowerCase();
+      const filtered = knownCategories.filter(c =>
+        c.toLowerCase().includes(q) && c.toLowerCase() !== q
+      );
+      setCatSuggestions(filtered.slice(0, 6));
+      setShowCatSuggestions(filtered.length > 0);
+    } else {
+      // Show all categories when field is focused but empty
+      setCatSuggestions(knownCategories.slice(0, 6));
+      setShowCatSuggestions(knownCategories.length > 0);
+    }
+  };
+
+  const applyCatSuggestion = (cat) => {
+    setForm(f => ({ ...f, category: cat }));
+    setCatSuggestions([]); setShowCatSuggestions(false); setActiveCatIdx(-1);
+  };
+
+  const handleCategoryKeyDown = (e) => {
+    if (!showCatSuggestions) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveCatIdx(i => Math.min(i + 1, catSuggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveCatIdx(i => Math.max(i - 1, -1)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (activeCatIdx >= 0) { applyCatSuggestion(catSuggestions[activeCatIdx]); } }
+    else if (e.key === "Escape") { setCatSuggestions([]); setShowCatSuggestions(false); }
+    else if (e.key === "Tab" && activeCatIdx >= 0) { e.preventDefault(); applyCatSuggestion(catSuggestions[activeCatIdx]); }
+  };
+
+  const handleCategoryFocus = () => {
+    if (!form.category.trim()) {
+      setCatSuggestions(knownCategories.slice(0, 6));
+      setShowCatSuggestions(knownCategories.length > 0);
+    }
   };
 
   // ── חישוב אוטומטי ──
@@ -104,7 +149,6 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
   };
 
   const handlePriceChange = (val) => {
-    // אם יש מחיר עלות — חשב אחוז רווח אוטומטית
     const cost = form.costPrice;
     const newMargin = cost && val ? calcMargin(cost, val) : form.profitMargin;
     setForm(f => ({ ...f, price: val, profitMargin: newMargin }));
@@ -152,7 +196,6 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
 
   if (!open) return null;
 
-  // חישוב רווח בשקלים לתצוגה
   const profitAmount = Number(form.price || 0) - Number(form.costPrice || 0);
   const showProfitHint = Number(form.costPrice) > 0 && Number(form.price) > 0;
 
@@ -185,12 +228,61 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
             </div>
           </div>
 
-          {/* קטגוריה */}
+          {/* קטגוריה עם השלמה אוטומטית */}
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: "#888", display: "block", marginBottom: 5 }}>קטגוריה</label>
             <div style={{ position: "relative" }}>
-              <div style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", color: "#bbb", pointerEvents: "none" }}>{Icon.tag}</div>
-              <input type="text" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="לדוגמה: מזון, חשמל..." style={{ ...inputStyle, paddingRight: 32 }} />
+              <div style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", color: "#bbb", pointerEvents: "none", zIndex: 1 }}>{Icon.tag}</div>
+              <input
+                type="text"
+                value={form.category}
+                onChange={e => handleCategoryChange(e.target.value)}
+                onFocus={handleCategoryFocus}
+                onBlur={() => setTimeout(() => { setCatSuggestions([]); setShowCatSuggestions(false); }, 150)}
+                onKeyDown={handleCategoryKeyDown}
+                placeholder="לדוגמה: חקלאות, מזון..."
+                autoComplete="off"
+                style={{ ...inputStyle, paddingRight: 32 }}
+              />
+
+              {/* Dropdown suggestions */}
+              {showCatSuggestions && catSuggestions.length > 0 && (
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, left: 0, zIndex: 200, background: "#fff", border: "0.5px solid #e0ddf8", borderRadius: 10, boxShadow: "0 6px 24px rgba(83,74,183,0.10)", overflow: "hidden" }}>
+                  <div style={{ padding: "6px 10px 4px", fontSize: 10, color: "#aaa", fontWeight: 600, borderBottom: "0.5px solid #f0f0f0", letterSpacing: "0.04em" }}>
+                    קטגוריות קיימות
+                  </div>
+                  {catSuggestions.map((cat, idx) => {
+                    const typed = form.category.trim().toLowerCase();
+                    const matchStart = cat.toLowerCase().indexOf(typed);
+                    return (
+                      <div
+                        key={cat}
+                        onMouseDown={() => applyCatSuggestion(cat)}
+                        onMouseEnter={() => setActiveCatIdx(idx)}
+                        style={{
+                          padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                          background: idx === activeCatIdx ? "#EEEDFE" : "transparent",
+                          color: idx === activeCatIdx ? "#3C3489" : "#1a1a1a",
+                          display: "flex", alignItems: "center", gap: 8,
+                          fontWeight: idx === activeCatIdx ? 600 : 400,
+                          transition: "background 0.1s",
+                        }}
+                      >
+                        <span style={{ color: "#bbb", flexShrink: 0 }}>{Icon.tag}</span>
+                        {typed && matchStart >= 0 ? (
+                          <>
+                            <span>{cat.slice(0, matchStart)}</span>
+                            <span style={{ color: "#534AB7", fontWeight: 700 }}>{cat.slice(matchStart, matchStart + typed.length)}</span>
+                            <span>{cat.slice(matchStart + typed.length)}</span>
+                          </>
+                        ) : (
+                          <span>{cat}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -201,7 +293,6 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-              {/* מחיר עלות */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#888", display: "block", marginBottom: 5 }}>
                   מחיר עלות <span style={{ color: "#bbb", fontWeight: 400 }}>(אופציונלי)</span>
@@ -212,7 +303,6 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
                 </div>
               </div>
 
-              {/* אחוז רווח */}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#888", display: "block", marginBottom: 5 }}>
                   אחוז רווח <span style={{ color: "#bbb", fontWeight: 400 }}>(אופציונלי)</span>
@@ -224,31 +314,23 @@ function ItemModal({ open, onClose, onSaved, editItem = null }) {
               </div>
             </div>
 
-            {/* חץ → */}
             {(form.costPrice || form.profitMargin) && (
               <div style={{ textAlign: "center", fontSize: 11, color: "#aaa", marginBottom: 6 }}>
                 ↓ מחיר מכירה מחושב אוטומטית
               </div>
             )}
 
-            {/* מחיר מכירה */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 5 }}>
                 מחיר מכירה *
               </label>
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", top: "50%", right: 10, transform: "translateY(-50%)", color: "#534AB7", pointerEvents: "none" }}>{Icon.shekel}</div>
-                <input
-                  type="number"
-                  value={form.price}
-                  onChange={e => handlePriceChange(e.target.value)}
-                  placeholder="₪ מכירה"
-                  style={{ ...inputStyle, paddingRight: 32, borderColor: "#AFA9EC", fontWeight: 700, fontSize: 14 }}
-                />
+                <input type="number" value={form.price} onChange={e => handlePriceChange(e.target.value)} placeholder="₪ מכירה"
+                  style={{ ...inputStyle, paddingRight: 32, borderColor: "#AFA9EC", fontWeight: 700, fontSize: 14 }} />
               </div>
             </div>
 
-            {/* תצוגת רווח */}
             {showProfitHint && (
               <div style={{ marginTop: 10, background: profitAmount >= 0 ? C.teal.bg : C.red.bg, border: `0.5px solid ${profitAmount >= 0 ? C.teal.border : C.red.border}`, borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: profitAmount >= 0 ? C.teal.text : C.red.text, fontWeight: 600 }}>
@@ -335,6 +417,11 @@ export default function ItemsPage() {
   const globalScanTimer = useRef(null);
   const [scanResult, setScanResult] = useState(null);
 
+  // ── Known categories: unique, sorted, derived from existing items ──
+  const knownCategories = [...new Set(
+    items.map(it => it.category?.trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, "he"));
+
   useEffect(() => {
     const handleGlobalKey = (e) => {
       if (modalOpen) return;
@@ -410,7 +497,13 @@ export default function ItemsPage() {
         }
       `}</style>
 
-      <ItemModal open={modalOpen} onClose={() => { setModalOpen(false); setEditItem(null); }} onSaved={fetchItems} editItem={editItem} />
+      <ItemModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditItem(null); }}
+        onSaved={fetchItems}
+        editItem={editItem}
+        knownCategories={knownCategories}
+      />
 
       <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, animation: "fadeIn 0.3s ease" }}>
 
