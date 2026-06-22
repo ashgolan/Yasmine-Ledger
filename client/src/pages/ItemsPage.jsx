@@ -40,6 +40,7 @@ const Icon = {
   empty:   <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M8 16l16-8 16 8v16l-16 8-16-8V16z" stroke="#ddd" strokeWidth="1.5" strokeLinejoin="round"/><path d="M24 8v32M8 16l16 8 16-8" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   edit:    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11 2l3 3-9 9H2v-3l9-9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
   profit:  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12l4-5 3 3 5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  bulkPrice: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="11" cy="11" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M13 3L3 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M11 4h2M13 3v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 };
 
 function Skeleton({ w, h, radius = 6 }) {
@@ -404,6 +405,156 @@ function ItemModal({ open, onClose, onSaved, editItem = null, knownCategories = 
   );
 }
 
+
+// ─── Modal עדכון מחירי קטגוריה ──────────────────────────────────────────────
+function BulkPriceModal({ open, onClose, category, categoryItems, onSaved }) {
+  const [percent, setPercent] = useState("");
+  const [mode, setMode] = useState("increase"); // "increase" | "decrease"
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) { setPercent(""); setMode("increase"); setError(""); }
+  }, [open]);
+
+  const pct = Number(percent || 0);
+  const multiplier = mode === "increase" ? (1 + pct / 100) : (1 - pct / 100);
+
+  const preview = categoryItems.map(item => ({
+    ...item,
+    newPrice: pct > 0 ? Math.round(item.price * multiplier) : item.price,
+  }));
+
+  const handleApply = async () => {
+    if (!pct || pct <= 0) { setError("יש להזין אחוז חיובי"); return; }
+    if (pct > 100 && mode === "decrease") { setError("לא ניתן להוריד יותר מ-100%"); return; }
+    try {
+      setLoading(true); setError("");
+      await Promise.all(
+        categoryItems.map(item =>
+          api.put(`/items/${item._id}`, {
+            ...item,
+            price: Math.round(item.price * multiplier),
+          })
+        )
+      );
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || "שגיאה בעדכון המחירים");
+    } finally { setLoading(false); }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 440, direction: "rtl", boxShadow: "0 24px 60px rgba(0,0,0,0.18)", animation: "fadeIn 0.2s ease", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 20px 16px", borderBottom: "0.5px solid #f0f0f0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>עדכון מחירי קטגוריה</div>
+            <button onClick={onClose} style={{ background: "#f5f5f5", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>
+              {Icon.close}
+            </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+            <span style={{ fontSize: 12, color: "#aaa" }}>קטגוריה:</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#534AB7", background: C.purple.bg, borderRadius: 6, padding: "2px 10px" }}>{category}</span>
+            <span style={{ fontSize: 11, color: "#bbb" }}>· {categoryItems.length} פריטים</span>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div style={{ padding: "16px 20px", borderBottom: "0.5px solid #f0f0f0" }}>
+          {/* Mode toggle */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[
+              { value: "increase", label: "העלאה", icon: "↑", color: C.teal },
+              { value: "decrease", label: "הורדה", icon: "↓", color: C.red },
+            ].map(m => (
+              <button key={m.value} onClick={() => setMode(m.value)}
+                style={{ flex: 1, padding: "10px 8px", borderRadius: 10, border: `1.5px solid ${mode === m.value ? m.color.border : "#e0e0e0"}`, background: mode === m.value ? m.color.bg : "#f9f9f9", cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <span style={{ fontSize: 16, color: mode === m.value ? m.color.icon : "#aaa" }}>{m.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: mode === m.value ? m.color.text : "#888" }}>{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Percent input */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <input
+                type="number" min="0" max="999" step="1"
+                value={percent}
+                onChange={e => setPercent(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleApply()}
+                placeholder="הזן אחוז..."
+                autoFocus
+                style={{ ...inputStyle, fontSize: 22, fontWeight: 700, textAlign: "center", paddingLeft: 36, color: mode === "increase" ? C.teal.text : C.red.text }}
+              />
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 18, fontWeight: 700, color: "#bbb", pointerEvents: "none" }}>%</span>
+            </div>
+            {pct > 0 && (
+              <div style={{ fontSize: 13, color: "#888", flexShrink: 0 }}>
+                = ×{multiplier.toFixed(2)}
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div style={{ marginTop: 10, background: C.red.bg, color: C.red.text, border: `0.5px solid ${C.red.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600 }}>{error}</div>
+          )}
+        </div>
+
+        {/* Preview */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+            תצוגה מקדימה
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {preview.map(item => {
+              const changed = pct > 0 && item.newPrice !== item.price;
+              const diff = item.newPrice - item.price;
+              return (
+                <div key={item._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: changed ? (mode === "increase" ? C.teal.bg : C.red.bg) : "#fafafa", borderRadius: 9, border: `0.5px solid ${changed ? (mode === "increase" ? C.teal.border : C.red.border) : "#f0f0f0"}`, transition: "all 0.2s" }}>
+                  <div style={{ flex: 1, fontSize: 13, color: "#1a1a1a", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, color: "#aaa", textDecoration: changed ? "line-through" : "none" }}>{fmtCurrency(item.price)}</span>
+                    {changed && (
+                      <>
+                        <span style={{ fontSize: 11, color: "#bbb" }}>→</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: mode === "increase" ? C.teal.text : C.red.text }}>{fmtCurrency(item.newPrice)}</span>
+                        <span style={{ fontSize: 10, color: mode === "increase" ? C.teal.text : C.red.text, opacity: 0.8 }}>
+                          {mode === "increase" ? "+" : ""}{fmtCurrency(diff)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: "14px 20px", borderTop: "0.5px solid #f0f0f0", display: "flex", gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "0.5px solid #ddd", background: "#fff", fontSize: 13, fontWeight: 600, color: "#666", cursor: "pointer" }}>
+            ביטול
+          </button>
+          <button onClick={handleApply} disabled={loading || !pct || pct <= 0}
+            style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: pct > 0 ? "#534AB7" : "#ddd", color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading || !pct ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, transition: "background 0.15s" }}>
+            {loading ? "מעדכן..." : pct > 0 ? `${mode === "increase" ? "העלה" : "הורד"} ${pct}% — ${categoryItems.length} פריטים` : "החל שינוי"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ItemsPage() {
   const [items, setItems] = useState([]);
@@ -416,6 +567,7 @@ export default function ItemsPage() {
   const globalScanBuffer = useRef("");
   const globalScanTimer = useRef(null);
   const [scanResult, setScanResult] = useState(null);
+  const [bulkModal, setBulkModal] = useState({ open: false, category: "", items: [] });
 
   // ── Known categories: unique, sorted, derived from existing items ──
   const knownCategories = [...new Set(
@@ -503,6 +655,13 @@ export default function ItemsPage() {
         onSaved={fetchItems}
         editItem={editItem}
         knownCategories={knownCategories}
+      />
+      <BulkPriceModal
+        open={bulkModal.open}
+        onClose={() => setBulkModal({ open: false, category: "", items: [] })}
+        category={bulkModal.category}
+        categoryItems={bulkModal.items}
+        onSaved={fetchItems}
       />
 
       <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, animation: "fadeIn 0.3s ease" }}>
@@ -596,6 +755,12 @@ export default function ItemsPage() {
                     <div style={{ width: 26, height: 26, borderRadius: 7, background: col.bg, color: col.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{Icon.tag}</div>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{cat}</span>
                     <span style={{ fontSize: 11, color: col.text, background: col.bg, borderRadius: 20, padding: "2px 10px", fontWeight: 600, marginRight: "auto" }}>{grouped[cat].length} פריטים</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); setBulkModal({ open: true, category: cat, items: grouped[cat] }); }}
+                      title="עדכן מחירי קטגוריה"
+                      style={{ display: "flex", alignItems: "center", gap: 5, background: "#fff", color: "#534AB7", border: "0.5px solid #AFA9EC", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", flexShrink: 0, touchAction: "manipulation" }}>
+                      {Icon.bulkPrice} עדכן מחירים
+                    </button>
                   </div>
 
                   {grouped[cat].map((item, i) => {
