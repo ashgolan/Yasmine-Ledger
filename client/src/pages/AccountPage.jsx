@@ -48,6 +48,7 @@ const Icon = {
   check: <svg width="26" height="26" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   barcode: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="4" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="6" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="9" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="11" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="14" y="3" width="1" height="10" fill="currentColor" rx="0.5" /></svg>,
   scan: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1 5V2h3M12 2h3v3M1 11v3h3M12 14h3v-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M1 8h14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+  flask: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 2v5L2 13h12L10 7V2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 2h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="6" cy="11" r="0.8" fill="currentColor"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/></svg>,
 };
 
 function StatCard({ label, value, icon, color }) {
@@ -122,6 +123,264 @@ function TxCard({ t, onEdit, onDelete }) {
   );
 }
 
+// ── Dosage Calculator Modal ──────────────────────────────────────────────────
+function CalcModal({ open, onClose, items, onAdd }) {
+  const [itemId, setItemId] = useState("");
+  const [containerLiters, setContainerLiters] = useState("");
+  const [sellMode, setSellMode] = useState("10ml"); // "10ml" | "100ml" | "custom"
+  const [customUnitMl, setCustomUnitMl] = useState("50");
+  const [markup10, setMarkup10] = useState(3);
+  const [markup100, setMarkup100] = useState(2);
+  const [markupCustom, setMarkupCustom] = useState(2.5);
+  const [customerMl, setCustomerMl] = useState("");
+  const [roundPrice, setRoundPrice] = useState(true);
+
+  useEffect(() => {
+    if (open) {
+      setItemId(""); setContainerLiters(""); setCustomerMl("");
+      setSellMode("10ml");
+    }
+  }, [open]);
+
+  // Filter by category חקלאות
+  const agriItems = items.filter(it =>
+    it.category === "חקלאות" || it.category === "agriculture" || it.category === "agri"
+  );
+  const displayItems = agriItems.length > 0 ? agriItems : items;
+
+  const selectedItem = items.find(it => it._id === itemId);
+  const itemPrice = Number(selectedItem?.price || 0);
+  const liters = Number(containerLiters) || 0;
+  const ml = Number(customerMl) || 0;
+  const pricePerLiter = liters > 0 && itemPrice > 0 ? itemPrice / liters : 0;
+
+  // Unit calculations
+  let unitMl = sellMode === "10ml" ? 10 : sellMode === "100ml" ? 100 : Number(customUnitMl) || 50;
+  let markup = sellMode === "10ml" ? markup10 : sellMode === "100ml" ? markup100 : markupCustom;
+  // price per unitMl (selling) = (pricePerLiter / (1000/unitMl)) * markup
+  // equivalently: (pricePerLiter * unitMl / 1000) * markup
+  const unitPriceRaw = pricePerLiter > 0 ? (pricePerLiter * unitMl / 1000) * markup : 0;
+  const unitsCount = unitMl > 0 ? ml / unitMl : 0;
+  const totalRaw = unitsCount * unitPriceRaw;
+  const totalFinal = roundPrice ? Math.ceil(totalRaw * 2) / 2 : Math.round(totalRaw * 100) / 100;
+  const costPerUnit = pricePerLiter > 0 ? (pricePerLiter * unitMl / 1000) : 0;
+  const profitPct = costPerUnit > 0 ? ((unitPriceRaw - costPerUnit) / costPerUnit * 100).toFixed(0) : 0;
+
+  const isValid = selectedItem && liters > 0 && ml > 0 && totalFinal > 0;
+
+  const handleAdd = () => {
+    if (!isValid) return;
+    const unitLabel = sellMode === "10ml" ? "10 מ״ל" : sellMode === "100ml" ? "100 מ״ל" : `${customUnitMl} מ״ל`;
+    onAdd({
+      description: `${selectedItem.name} — ${ml} מ״ל`,
+      amount: totalFinal,
+      unitPrice: Math.round(unitPriceRaw * 100) / 100,
+      itemId: selectedItem._id,
+    });
+    onClose();
+  };
+
+  const modes = [
+    { value: "10ml", label: "10 מ״ל", sub: `× ${markup10}`, color: C.purple },
+    { value: "100ml", label: "100 מ״ל", sub: `× ${markup100}`, color: C.teal },
+    { value: "custom", label: "מותאם", sub: `× ${markupCustom}`, color: C.amber },
+  ];
+
+  if (!open) return null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 460, maxHeight: "90vh", overflow: "auto", direction: "rtl", boxShadow: "0 28px 70px rgba(83,74,183,0.18)" }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ background: "linear-gradient(135deg, #534AB7 0%, #6B5CE7 100%)", borderRadius: "20px 20px 0 0", padding: "20px 20px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🧪</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>מחשבון מינונים</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 1 }}>חישוב מחיר לכמויות קטנות</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+              {Icon.close}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: "20px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Step 1: Product */}
+            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.purple.bg, color: C.purple.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>1</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>בחר מוצר {agriItems.length > 0 ? "(חקלאות)" : "(כל הפריטים)"}</span>
+              </div>
+              <select value={itemId} onChange={e => setItemId(e.target.value)} style={{ ...selectStyle }}>
+                <option value="">— בחר פריט —</option>
+                {displayItems.map(it => (
+                  <option key={it._id} value={it._id}>{it.name}{it.price ? ` — ₪${it.price}` : ""}</option>
+                ))}
+              </select>
+              {selectedItem && (
+                <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ background: C.purple.bg, borderRadius: 7, padding: "5px 10px", fontSize: 12 }}>
+                    <span style={{ color: "#888" }}>מחיר אריזה: </span>
+                    <span style={{ fontWeight: 700, color: C.purple.text }}>₪{selectedItem.price}</span>
+                  </div>
+                  {selectedItem.costPrice && (
+                    <div style={{ background: C.teal.bg, borderRadius: 7, padding: "5px 10px", fontSize: 12 }}>
+                      <span style={{ color: "#888" }}>עלות: </span>
+                      <span style={{ fontWeight: 700, color: C.teal.text }}>₪{selectedItem.costPrice}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Container size */}
+            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.blue.bg, color: C.blue.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>2</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>נפח האריזה</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="number" value={containerLiters} onChange={e => setContainerLiters(e.target.value)}
+                  placeholder="5" min="0" step="0.1"
+                  style={{ ...inputStyle, flex: 1 }} />
+                <span style={{ fontSize: 13, color: "#888", fontWeight: 600, flexShrink: 0 }}>ליטר</span>
+              </div>
+              {pricePerLiter > 0 && (
+                <div style={{ marginTop: 10, background: C.blue.bg, border: `0.5px solid ${C.blue.border}`, borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: C.blue.text, fontWeight: 600 }}>מחיר ל-1 ליטר</span>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: C.blue.text }}>₪{pricePerLiter.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Step 3: Selling mode */}
+            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.amber.bg, color: C.amber.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>3</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>אופן מכירה ומקדם רווח</span>
+              </div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {modes.map(m => (
+                  <button key={m.value} onClick={() => setSellMode(m.value)}
+                    style={{ flex: 1, padding: "9px 6px", borderRadius: 9, border: `1.5px solid ${sellMode === m.value ? m.color.border : "#e0e0e0"}`, background: sellMode === m.value ? m.color.bg : "#f9f9f9", cursor: "pointer", transition: "all 0.15s", textAlign: "center" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: sellMode === m.value ? m.color.text : "#666" }}>{m.label}</div>
+                    <div style={{ fontSize: 10, color: sellMode === m.value ? m.color.icon : "#bbb", marginTop: 1 }}>מקדם {m.sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom unit + editable markup */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {sellMode === "custom" && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }}>
+                    <span style={{ fontSize: 11, color: "#888", flexShrink: 0 }}>וחידה (מ״ל):</span>
+                    <input type="number" value={customUnitMl} onChange={e => setCustomUnitMl(e.target.value)}
+                      min="1" style={{ ...inputStyle, width: 70, textAlign: "center" }} />
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flex: sellMode === "custom" ? "none" : 1 }}>
+                  <span style={{ fontSize: 11, color: "#888", flexShrink: 0 }}>מקדם:</span>
+                  <input type="number"
+                    value={sellMode === "10ml" ? markup10 : sellMode === "100ml" ? markup100 : markupCustom}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      if (sellMode === "10ml") setMarkup10(v);
+                      else if (sellMode === "100ml") setMarkup100(v);
+                      else setMarkupCustom(v);
+                    }}
+                    min="1" step="0.5"
+                    style={{ ...inputStyle, width: 65, textAlign: "center" }} />
+                </div>
+              </div>
+
+              {/* Price per unit preview */}
+              {unitPriceRaw > 0 && (
+                <div style={{ marginTop: 10, background: C.amber.bg, border: `0.5px solid ${C.amber.border}`, borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: C.amber.text, fontWeight: 600 }}>מחיר ל-{unitMl} מ״ל</span>
+                  <div style={{ textAlign: "left" }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: C.amber.text }}>₪{unitPriceRaw.toFixed(3)}</span>
+                    {costPerUnit > 0 && <span style={{ fontSize: 10, color: C.teal.text, marginRight: 8 }}>רווח {profitPct}%</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 4: Customer quantity */}
+            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.teal.bg, color: C.teal.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>4</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>כמות ללקוח</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="number" value={customerMl} onChange={e => setCustomerMl(e.target.value)}
+                  placeholder="150" min="1"
+                  style={{ ...inputStyle, flex: 1, fontSize: 16, fontWeight: 600, textAlign: "center" }} />
+                <span style={{ fontSize: 13, color: "#888", fontWeight: 600, flexShrink: 0 }}>מ״ל</span>
+              </div>
+              {/* Round toggle */}
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} onClick={() => setRoundPrice(r => !r)}>
+                <div style={{ width: 32, height: 18, borderRadius: 9, background: roundPrice ? C.purple.icon : "#ddd", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 2, right: roundPrice ? 2 : 14, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "right 0.2s" }} />
+                </div>
+                <span style={{ fontSize: 11, color: "#888" }}>עגל מחיר לחצי שקל קרוב</span>
+              </div>
+            </div>
+
+            {/* Result card */}
+            {isValid && (
+              <div style={{ background: "linear-gradient(135deg, #EEEDFE 0%, #E6F1FB 100%)", border: `1.5px solid ${C.purple.border}`, borderRadius: 14, padding: "16px", animation: "fadeIn 0.2s ease" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.purple.text, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>תוצאת החישוב</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}>
+                    <span>מחיר ל-{unitMl} מ״ל</span>
+                    <span style={{ fontWeight: 600 }}>₪{unitPriceRaw.toFixed(3)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}>
+                    <span>מספר יחידות ({ml} ÷ {unitMl})</span>
+                    <span style={{ fontWeight: 600 }}>{unitsCount % 1 === 0 ? unitsCount : unitsCount.toFixed(1)} יח׳</span>
+                  </div>
+                  {roundPrice && totalRaw !== totalFinal && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#aaa" }}>
+                      <span>לפני עיגול</span>
+                      <span>₪{totalRaw.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ height: 1, background: `${C.purple.border}`, margin: "4px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.purple.text }}>סה״כ לחיוב</span>
+                    <span style={{ fontSize: 22, fontWeight: 800, color: C.purple.text }}>₪{totalFinal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <button onClick={onClose}
+              style={{ background: "#f5f5f5", color: "#555", border: "none", borderRadius: 10, padding: "11px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              ביטול
+            </button>
+            <button onClick={handleAdd} disabled={!isValid}
+              style={{ flex: 1, background: isValid ? C.purple.icon : "#ddd", color: "#fff", border: "none", borderRadius: 10, padding: "11px 0", fontSize: 14, fontWeight: 700, cursor: isValid ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, transition: "background 0.15s" }}>
+              {Icon.plus} הוסף לרשימה
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Edit Customer Modal ──
 function EditCustomerModal({ open, onClose, customer, onSaved, knownLastNames = [] }) {
   const [form, setForm] = useState({ fullName: "", phone: "", idNumber: "" });
@@ -156,14 +415,10 @@ function EditCustomerModal({ open, onClose, customer, onSaved, knownLastNames = 
     const parts = val.split(/\s+/);
     if (parts.length >= 2 && parts[parts.length - 1].length >= 1) {
       const lastPart = parts[parts.length - 1].toLowerCase();
-      const filtered = knownLastNames.filter(ln =>
-        ln.toLowerCase().startsWith(lastPart) && ln.toLowerCase() !== lastPart
-      );
+      const filtered = knownLastNames.filter(ln => ln.toLowerCase().startsWith(lastPart) && ln.toLowerCase() !== lastPart);
       setSuggestions(filtered.slice(0, 6));
       setShowSuggestions(filtered.length > 0);
-    } else {
-      setSuggestions([]); setShowSuggestions(false);
-    }
+    } else { setSuggestions([]); setShowSuggestions(false); }
   };
 
   const applySuggestion = (lastName) => {
@@ -198,21 +453,16 @@ function EditCustomerModal({ open, onClose, customer, onSaved, knownLastNames = 
             <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 5 }}>שם מלא *</label>
             <div style={{ position: "relative" }}>
               <div style={{ position: "absolute", top: "50%", right: 11, transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none", zIndex: 1 }}>{Icon.person}</div>
-              <input autoFocus value={form.fullName}
-                onChange={handleNameChange}
-                onKeyDown={handleNameKeyDown}
+              <input autoFocus value={form.fullName} onChange={handleNameChange} onKeyDown={handleNameKeyDown}
                 onBlur={() => setTimeout(() => { setSuggestions([]); setShowSuggestions(false); }, 150)}
-                placeholder="ישראל ישראלי"
-                autoComplete="off"
-                style={{ ...inputStyle, paddingRight: 36 }} />
+                placeholder="ישראל ישראלי" autoComplete="off" style={{ ...inputStyle, paddingRight: 36 }} />
               {showSuggestions && suggestions.length > 0 && (
                 <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, left: 0, zIndex: 200, background: "#fff", border: "0.5px solid #e0ddf8", borderRadius: 10, boxShadow: "0 6px 24px rgba(83,74,183,0.10)", overflow: "hidden" }}>
                   <div style={{ padding: "6px 10px 4px", fontSize: 10, color: "#aaa", fontWeight: 600, borderBottom: "0.5px solid #f0f0f0", letterSpacing: "0.04em" }}>משפחות מוכרות</div>
                   {suggestions.map((ln, idx) => {
                     const typed = form.fullName.trim().split(/\s+/).pop();
                     return (
-                      <div key={ln} onMouseDown={() => applySuggestion(ln)}
-                        onMouseEnter={() => setActiveSuggestion(idx)}
+                      <div key={ln} onMouseDown={() => applySuggestion(ln)} onMouseEnter={() => setActiveSuggestion(idx)}
                         style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", background: idx === activeSuggestion ? "#EEEDFE" : "transparent", color: idx === activeSuggestion ? "#3C3489" : "#1a1a1a", display: "flex", alignItems: "center", gap: 4, fontWeight: idx === activeSuggestion ? 600 : 400, transition: "background 0.1s" }}>
                         <span style={{ color: "#534AB7", fontWeight: 700 }}>{ln.slice(0, typed.length)}</span>
                         <span>{ln.slice(typed.length)}</span>
@@ -283,16 +533,9 @@ function DeleteCustomerModal({ open, onClose, customer, stats, onDeleted }) {
         <div style={{ background: "#FAFAFA", border: "0.5px solid #eee", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>מה יימחק לצמיתות</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {[
-              ["🧾", "עסקאות בחשבון הנוכחי", stats?.transactions],
-              ["📦", "חשבונות בארכיון", stats?.archivedAccounts],
-              ["📋", "הצעות מחיר", stats?.quotes],
-              ["🚚", "תעודות משלוח", stats?.deliveryNotes],
-            ].map(([emoji, label, val]) => (
+            {[["🧾", "עסקאות בחשבון הנוכחי", stats?.transactions], ["📦", "חשבונות בארכיון", stats?.archivedAccounts], ["📋", "הצעות מחיר", stats?.quotes], ["🚚", "תעודות משלוח", stats?.deliveryNotes]].map(([emoji, label, val]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 15 }}>{emoji}</span> {label}
-                </span>
+                <span style={{ fontSize: 13, color: "#555", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 15 }}>{emoji}</span> {label}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.red.text }}>{val ?? "—"}</span>
               </div>
             ))}
@@ -344,6 +587,7 @@ export default function AccountPage() {
   const [pinError, setPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
   const [pinShake, setPinShake] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const handlePinSubmit = async () => {
     if (!pinCode.trim()) return;
@@ -360,7 +604,6 @@ export default function AccountPage() {
     } finally { setPinLoading(false); }
   };
 
-  // ── Batch form ──
   const today = new Date().toISOString().slice(0, 10);
   const [batchType, setBatchType] = useState("debt");
   const [batchDate, setBatchDate] = useState(today);
@@ -381,7 +624,6 @@ export default function AccountPage() {
   }, []);
 
   const [allCustomers, setAllCustomers] = useState([]);
-
   const knownLastNames = useMemo(() => {
     const set = new Set();
     allCustomers.forEach(c => {
@@ -409,9 +651,7 @@ export default function AccountPage() {
       setAllCustomers(Array.isArray(custsRes.data) ? custsRes.data : []);
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה בטעינת הנתונים");
-    } finally {
-      if (isInitial) setLoading(false);
-    }
+    } finally { if (isInitial) setLoading(false); }
   };
 
   useEffect(() => { if (customerId) fetchData(true); }, [customerId]);
@@ -431,17 +671,11 @@ export default function AccountPage() {
             const qty = Number(prev[emptyIdx >= 0 ? emptyIdx : 0].quantity || 1);
             const amt = qty && match.price ? qty * match.price : match.price || 0;
             const updated = { ...prev[emptyIdx >= 0 ? emptyIdx : 0], description: match.name, unitPrice: String(match.price || ""), amount: String(amt), item: match._id };
-            if (emptyIdx >= 0) {
-              const next = [...prev];
-              next[emptyIdx] = updated;
-              return next;
-            }
+            if (emptyIdx >= 0) { const next = [...prev]; next[emptyIdx] = updated; return next; }
             return [...prev, { ...newRow(), ...updated }];
           });
           setScanToast({ found: true, name: match.name, price: match.price, code });
-        } else {
-          setScanToast({ found: false, code });
-        }
+        } else { setScanToast({ found: false, code }); }
         setScanMode(false);
         clearTimeout(scanToastTimer.current);
         scanToastTimer.current = setTimeout(() => setScanToast(null), 3000);
@@ -453,6 +687,16 @@ export default function AccountPage() {
     window.addEventListener("keydown", handleKey, true);
     return () => { window.removeEventListener("keydown", handleKey, true); clearTimeout(scanTimer.current); };
   }, [scanMode, items]);
+
+  // Handle adding from CalcModal to batch rows
+  const handleCalcAdd = ({ description, amount, unitPrice, itemId }) => {
+    setBatchRows(prev => {
+      const emptyIdx = prev.findIndex(r => !r.description && !r.amount);
+      const row = { id: crypto.randomUUID(), description, quantity: "", unitPrice: String(Math.round(unitPrice * 100) / 100), amount: String(amount), note: "", item: itemId || null, sharedNote: prev[0]?.sharedNote || "" };
+      if (emptyIdx >= 0) { const next = [...prev]; next[emptyIdx] = row; return next; }
+      return [...prev, row];
+    });
+  };
 
   const updateRow = (id, patch) => {
     setBatchRows(prev => prev.map(row => {
@@ -477,29 +721,19 @@ export default function AccountPage() {
       for (const row of valid) {
         lastRes = await api.post("/transactions", {
           accountId: data?.account?._id,
-          type: batchType, date: batchDate === today
-            ? new Date().toISOString()
-            : new Date(batchDate + "T12:00:00").toISOString(),
-          description: row.description,
-          quantity: Number(row.quantity || 0),
-          unitPrice: Number(row.unitPrice || 0),
-          amount: Number(row.amount),
-          note: sharedNote,
-          item: row.item || null,
+          type: batchType, date: batchDate === today ? new Date().toISOString() : new Date(batchDate + "T12:00:00").toISOString(),
+          description: row.description, quantity: Number(row.quantity || 0), unitPrice: Number(row.unitPrice || 0),
+          amount: Number(row.amount), note: sharedNote, item: row.item || null,
         });
       }
       resetBatch();
       await fetchData();
       if (lastRes?.data?.shouldAskArchive) setShowArchivePrompt(true);
-    } catch (err) {
-      setError(err.response?.data?.message || "שגיאה בהוספת עסקאות");
-    } finally { setAdding(false); }
+    } catch (err) { setError(err.response?.data?.message || "שגיאה בהוספת עסקאות"); }
+    finally { setAdding(false); }
   };
 
-  const startEdit = (t) => {
-    setEditingId(t._id);
-    setEditForm({ date: t.date ? new Date(t.date).toISOString().slice(0, 10) : "", type: t.type, description: t.description || "", quantity: t.quantity ?? "", unitPrice: t.unitPrice ?? "", amount: t.amount ?? "", note: t.note || "" });
-  };
+  const startEdit = (t) => { setEditingId(t._id); setEditForm({ date: t.date ? new Date(t.date).toISOString().slice(0, 10) : "", type: t.type, description: t.description || "", quantity: t.quantity ?? "", unitPrice: t.unitPrice ?? "", amount: t.amount ?? "", note: t.note || "" }); };
   const cancelEdit = () => { setEditingId(null); setEditForm({}); };
   const handleEditChange = (field, value) => {
     const next = { ...editForm, [field]: value };
@@ -510,11 +744,8 @@ export default function AccountPage() {
     setEditForm(next);
   };
   const saveEdit = async (id) => {
-    try {
-      await api.put(`/transactions/${id}`, editForm);
-      setEditingId(null); setEditForm({});
-      await fetchData();
-    } catch (err) { setError(err.response?.data?.message || "שגיאה בעדכון"); }
+    try { await api.put(`/transactions/${id}`, editForm); setEditingId(null); setEditForm({}); await fetchData(); }
+    catch (err) { setError(err.response?.data?.message || "שגיאה בעדכון"); }
   };
   const handleDelete = async (id) => {
     if (!window.confirm("האם למחוק את השורה?")) return;
@@ -528,8 +759,7 @@ export default function AccountPage() {
       const accountId = data?.account?._id;
       if (!accountId) { setError("לא נמצא מזהה חשבון"); return; }
       await api.post(`/accounts/archive/${accountId}`);
-      setShowArchivePrompt(false); setTab(1);
-      await fetchData();
+      setShowArchivePrompt(false); setTab(1); await fetchData();
     } catch (err) { setError(err.response?.data?.message || "שגיאה בארכוב החשבון"); }
     finally { setArchiving(false); }
   };
@@ -554,74 +784,13 @@ export default function AccountPage() {
     const debtsTotal = transactions.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
     const paymentsTotal = transactions.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
     const returnsTotal = transactions.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
-    const rows = transactions.map(t => `
-  <tr>
-    <td>${fmtDate(t.date)}</td>
-    <td>${getTypeInfo(t.type).label}</td>
-    <td>${t.description || "—"}</td>
-    <td>${t.type === "payment" ? "—" : t.quantity || "—"}</td>
-    <td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td>
-    <td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td>
-    <td class="note-cell">${t.note ? `📝 ${t.note}` : "—"}</td>
-  </tr>
-`).join("");
-    const logoBanner = settings?.logoBase64
-      ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>`
-      : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
-    const storeInfo = [
-      settings?.storePhone ? `טלפון: ${settings.storePhone}` : "",
-      settings?.storeAddress || "",
-    ].filter(Boolean).join(" · ");
+    const rows = transactions.map(t => `<tr><td>${fmtDate(t.date)}</td><td>${getTypeInfo(t.type).label}</td><td>${t.description || "—"}</td><td>${t.type === "payment" ? "—" : t.quantity || "—"}</td><td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td><td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td><td class="note-cell">${t.note ? `📝 ${t.note}` : "—"}</td></tr>`).join("");
+    const logoBanner = settings?.logoBase64 ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>` : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
+    const storeInfo = [settings?.storePhone ? `טלפון: ${settings.storePhone}` : "", settings?.storeAddress || ""].filter(Boolean).join(" · ");
+    const customer = data?.account?.customer;
     const w = window.open("", "_blank", "width=1000,height=800");
     if (!w) return;
-    w.document.write(`<html dir="rtl"><head><title>חשבון לקוח — ${customerName}</title><style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;direction:rtl;color:#111;background:#fff}
-.logo-banner{width:100%;background:#f8f8f8;border-bottom:2px solid #eee;display:flex;align-items:center;justify-content:center;padding:18px 32px;min-height:80px}
-.logo-text{font-size:26px;font-weight:800;color:#1a1a1a;letter-spacing:-0.5px}
-.store-info{text-align:center;font-size:12px;color:#888;padding:7px 32px 0;border-bottom:1px solid #f0f0f0;padding-bottom:10px}
-.details{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 32px;border-bottom:1px solid #eee;font-size:12px;color:#555;line-height:1.9}
-.details strong{color:#111;font-size:13px}
-.details-right{text-align:right}
-.details-left{text-align:left;color:#666}
-.content{padding:0 32px 32px}
-table{width:100%;border-collapse:collapse;margin-top:16px}
-th,td{border:1px solid #ddd;padding:9px 11px;text-align:right;font-size:13px}
-th{background:#f5f5f5;font-weight:700;color:#444}
-.note-cell{font-size:11px;color:#777;max-width:160px;word-break:break-word}
-tr:nth-child(even){background:#fafafa}
-.summary{margin-top:20px;border:1px solid #eee;border-radius:8px;overflow:hidden}
-.summary-row{display:flex;justify-content:space-between;padding:9px 16px;font-size:13px;border-bottom:1px solid #f0f0f0}
-.summary-row:last-child{border-bottom:none}
-.summary-row.total{background:#f5f5f5;font-size:16px;font-weight:800}
-.debt-color{color:#A32D2D}.pay-color{color:#0F6E56}.bal-color{color:#534AB7}
-.footer{margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center}
-@media print{body{}}
-</style></head><body>
-${logoBanner}
-${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}
-<div class="details">
-  <div class="details-right">
-    <div>לקוח: <strong>${customerName}</strong></div>
-    ${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}
-    ${customer?.idNumber ? `<div>ת.ז.: <strong>${customer.idNumber}</strong></div>` : ""}
-  </div>
-  <div class="details-left">
-    <div>תאריך הדפסה: <strong>${fmtDate(new Date())}</strong></div>
-  </div>
-</div>
-<div class="content">
-<table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="summary">
-  <div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row total"><span>יתרת חוב</span><span class="bal-color">${Number(balance || 0).toLocaleString("he-IL")} ₪</span></div>
-</div>
-${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}
-</div>
-<script>window.onload=()=>window.print()</script>
-</body></html>`);
+    w.document.write(`<html dir="rtl"><head><title>חשבון לקוח — ${customerName}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;direction:rtl;color:#111;background:#fff}.logo-banner{width:100%;background:#f8f8f8;border-bottom:2px solid #eee;display:flex;align-items:center;justify-content:center;padding:18px 32px;min-height:80px}.logo-text{font-size:26px;font-weight:800;color:#1a1a1a}.store-info{text-align:center;font-size:12px;color:#888;padding:7px 32px 10px;border-bottom:1px solid #f0f0f0}.details{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 32px;border-bottom:1px solid #eee;font-size:12px;color:#555;line-height:1.9}.details strong{color:#111;font-size:13px}.details-right{text-align:right}.details-left{text-align:left;color:#666}.content{padding:0 32px 32px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:9px 11px;text-align:right;font-size:13px}th{background:#f5f5f5;font-weight:700;color:#444}.note-cell{font-size:11px;color:#777;max-width:160px;word-break:break-word}tr:nth-child(even){background:#fafafa}.summary{margin-top:20px;border:1px solid #eee;border-radius:8px;overflow:hidden}.summary-row{display:flex;justify-content:space-between;padding:9px 16px;font-size:13px;border-bottom:1px solid #f0f0f0}.summary-row:last-child{border-bottom:none}.summary-row.total{background:#f5f5f5;font-size:16px;font-weight:800}.debt-color{color:#A32D2D}.pay-color{color:#0F6E56}.bal-color{color:#534AB7}.footer{margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center}</style></head><body>${logoBanner}${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}<div class="details"><div class="details-right"><div>לקוח: <strong>${customerName}</strong></div>${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}${customer?.idNumber ? `<div>ת.ז.: <strong>${customer.idNumber}</strong></div>` : ""}</div><div class="details-left"><div>תאריך הדפסה: <strong>${fmtDate(new Date())}</strong></div></div></div><div class="content"><table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead><tbody>${rows}</tbody></table><div class="summary"><div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row total"><span>יתרת חוב</span><span class="bal-color">${Number(balance || 0).toLocaleString("he-IL")} ₪</span></div></div>${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}</div><script>window.onload=()=>window.print()</script></body></html>`);
     w.document.close();
   };
 
@@ -634,82 +803,11 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
     const debtsTotal = transactions.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
     const paymentsTotal = transactions.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
     const returnsTotal = transactions.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
-    const rows = transactions.map(t => `
-          <tr>
-            <td>${fmtDate(t.date)}</td>
-            <td>${getTypeInfo(t.type).label}</td>
-            <td>${t.description || "—"}</td>
-            <td>${t.type === "payment" ? "—" : t.quantity || "—"}</td>
-            <td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td>
-            <td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td>
-            <td>${t.note ? `📝 ${t.note}` : "—"}</td>
-          </tr>
-        `).join("");
-    const logoBanner = settings?.logoBase64
-      ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>`
-      : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
-    const storeInfoParts = [
-      settings?.storePhone ? `📞 ${settings.storePhone}` : null,
-      settings?.storeAddress ? `📍 ${settings.storeAddress}` : null,
-    ].filter(Boolean);
-    const storeInfo = storeInfoParts.join("  •  ");
+    const rows = transactions.map(t => `<tr><td>${fmtDate(t.date)}</td><td>${getTypeInfo(t.type).label}</td><td>${t.description || "—"}</td><td>${t.type === "payment" ? "—" : t.quantity || "—"}</td><td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td><td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td><td>${t.note ? `📝 ${t.note}` : "—"}</td></tr>`).join("");
+    const logoBanner = settings?.logoBase64 ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>` : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
+    const storeInfo = [settings?.storePhone ? `📞 ${settings.storePhone}` : null, settings?.storeAddress ? `📍 ${settings.storeAddress}` : null].filter(Boolean).join("  •  ");
     const w = window.open("", "_blank");
-    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"/>
-        <title>מצב חשבון — ${customerName}</title>
-        <style>
-          *{box-sizing:border-box;margin:0;padding:0}
-          body{font-family:Arial,'Arial Hebrew',sans-serif;direction:rtl;color:#1a1a1a;font-size:12px;padding:24px}
-          .logo-banner{text-align:center;margin-bottom:10px}
-          .logo-text{font-size:22px;font-weight:800;color:#534AB7}
-          .store-info{text-align:center;color:#888;font-size:11px;margin-bottom:14px}
-          .title{font-size:16px;font-weight:800;color:#534AB7;text-align:center;margin-bottom:14px;border-bottom:2px solid #EEEDFE;padding-bottom:10px}
-          .details{display:flex;justify-content:space-between;margin-bottom:14px;background:#f9f9f9;border-radius:8px;padding:10px 14px}
-          .details div{font-size:12px;color:#555;margin-bottom:3px}
-          .details strong{color:#1a1a1a}
-          table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}
-          th{background:#534AB7;color:#fff;padding:7px 8px;text-align:right;font-weight:700}
-          td{padding:6px 8px;border-bottom:0.5px solid #f0f0f0;color:#333}
-          tr:nth-child(even) td{background:#fafafa}
-          .summary{margin-top:10px;border:0.5px solid #e8e8e8;border-radius:8px;overflow:hidden}
-          .summary-row{display:flex;justify-content:space-between;padding:8px 14px;border-bottom:0.5px solid #f0f0f0;font-size:12px}
-          .summary-row:last-child{border-bottom:none}
-          .summary-row.total{background:#EEEDFE;font-weight:800;font-size:13px}
-          .debt-color{color:#A32D2D;font-weight:700}
-          .pay-color{color:#0F6E56;font-weight:700}
-          .bal-color{color:#534AB7;font-weight:700}
-          .footer{text-align:center;margin-top:18px;padding-top:10px;border-top:0.5px solid #eee;color:#aaa;font-size:10px}
-          @media print {
-            @page { margin: 10mm; }
-            body { padding: 0; }
-          }
-        </style></head><body>
-        ${logoBanner}
-        ${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}
-        <div class="title">כרטיס לקוח — מצב חשבון</div>
-        <div class="details">
-          <div>
-            <div>לקוח: <strong>${customerName}</strong></div>
-            ${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}
-            ${customer?.idNumber ? `<div>ת.ז.: <strong>${customer.idNumber}</strong></div>` : ""}
-          </div>
-          <div style="text-align:left"><div>תאריך: <strong>${fmtDate(new Date())}</strong></div></div>
-        </div>
-        <table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-        <div class="summary">
-          <div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div>
-          <div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div>
-          <div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div>
-          <div class="summary-row total"><span>יתרת חוב</span><span class="bal-color">${Number(balance || 0).toLocaleString("he-IL")} ₪</span></div>
-        </div>
-        ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}
-        <script>
-          window.onload = () => {
-            window.print();
-            window.onafterprint = () => window.close();
-          }
-        </script>
-        </body></html>`);
+    w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"/><title>מצב חשבון — ${customerName}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,'Arial Hebrew',sans-serif;direction:rtl;color:#1a1a1a;font-size:12px;padding:24px}.logo-banner{text-align:center;margin-bottom:10px}.logo-text{font-size:22px;font-weight:800;color:#534AB7}.store-info{text-align:center;color:#888;font-size:11px;margin-bottom:14px}.title{font-size:16px;font-weight:800;color:#534AB7;text-align:center;margin-bottom:14px;border-bottom:2px solid #EEEDFE;padding-bottom:10px}.details{display:flex;justify-content:space-between;margin-bottom:14px;background:#f9f9f9;border-radius:8px;padding:10px 14px}.details div{font-size:12px;color:#555;margin-bottom:3px}.details strong{color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}th{background:#534AB7;color:#fff;padding:7px 8px;text-align:right;font-weight:700}td{padding:6px 8px;border-bottom:0.5px solid #f0f0f0;color:#333}tr:nth-child(even) td{background:#fafafa}.summary{margin-top:10px;border:0.5px solid #e8e8e8;border-radius:8px;overflow:hidden}.summary-row{display:flex;justify-content:space-between;padding:8px 14px;border-bottom:0.5px solid #f0f0f0;font-size:12px}.summary-row:last-child{border-bottom:none}.summary-row.total{background:#EEEDFE;font-weight:800;font-size:13px}.debt-color{color:#A32D2D;font-weight:700}.pay-color{color:#0F6E56;font-weight:700}.bal-color{color:#534AB7;font-weight:700}.footer{text-align:center;margin-top:18px;padding-top:10px;border-top:0.5px solid #eee;color:#aaa;font-size:10px}@media print{@page{margin:10mm}body{padding:0}}</style></head><body>${logoBanner}${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}<div class="title">כרטיס לקוח — מצב חשבון</div><div class="details"><div><div>לקוח: <strong>${customerName}</strong></div>${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}${customer?.idNumber ? `<div>ת.ז.: <strong>${customer.idNumber}</strong></div>` : ""}</div><div style="text-align:left"><div>תאריך: <strong>${fmtDate(new Date())}</strong></div></div></div><table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead><tbody>${rows}</tbody></table><div class="summary"><div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row total"><span>יתרת חוב</span><span class="bal-color">${Number(balance || 0).toLocaleString("he-IL")} ₪</span></div></div>${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script></body></html>`);
     w.document.close();
   };
 
@@ -718,18 +816,13 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
     const customerName = data?.account?.customer?.fullName || "לקוח";
     const customerPhone = data?.account?.customer?.phone || "";
     const { balance } = data;
-    const balanceText = Number(balance || 0).toLocaleString("he-IL");
-    const dateStr = new Date().toLocaleDateString("he-IL");
-    const message = `שלום ${customerName},\n\nלהלן כרטיס החשבון שלך נכון לתאריך ${dateStr}:\n\n💰 יתרת חוב: ${balanceText} ₪\n\nלפרטים נוספים צור קשר.${settings?.storeName ? `\n\n${settings.storeName}` : ""}${settings?.storePhone ? `\n📞 ${settings.storePhone}` : ""}`;
+    const message = `שלום ${customerName},\n\nלהלן כרטיס החשבון שלך נכון לתאריך ${new Date().toLocaleDateString("he-IL")}:\n\n💰 יתרת חוב: ${Number(balance || 0).toLocaleString("he-IL")} ₪\n\nלפרטים נוספים צור קשר.${settings?.storeName ? `\n\n${settings.storeName}` : ""}${settings?.storePhone ? `\n📞 ${settings.storePhone}` : ""}`;
     const encoded = encodeURIComponent(message);
     if (customerPhone) {
       const clean = customerPhone.replace(/\D/g, "");
       const intl = clean.startsWith("0") ? "972" + clean.slice(1) : clean;
       window.open(`https://wa.me/${intl}?text=${encoded}`, "_blank");
-    } else {
-      window.open(`https://web.whatsapp.com/`, "_blank");
-      navigator.clipboard?.writeText(message);
-    }
+    } else { window.open(`https://web.whatsapp.com/`, "_blank"); navigator.clipboard?.writeText(message); }
   };
 
   const handlePrintArchive = async (item) => {
@@ -737,88 +830,18 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
     const customerPhone = data?.account?.customer?.phone || "";
     let transactions = item.transactions;
     if (!transactions) {
-      try {
-        const res = await api.get(`/accounts/archived/${item.account._id}`);
-        transactions = res.data.transactions;
-      } catch {
-        setError("שגיאה בטעינת פרטי הארכיון לצורך הדפסה");
-        return;
-      }
+      try { const res = await api.get(`/accounts/archived/${item.account._id}`); transactions = res.data.transactions; }
+      catch { setError("שגיאה בטעינת פרטי הארכיון לצורך הדפסה"); return; }
     }
     const debtsTotal = transactions.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
     const paymentsTotal = transactions.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
     const returnsTotal = transactions.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
-    const rows = transactions.map(t => `
-  <tr>
-    <td>${fmtDate(t.date)}</td>
-    <td>${getTypeInfo(t.type).label}</td>
-    <td>${t.description || "—"}</td>
-    <td>${t.type === "payment" ? "—" : t.quantity || "—"}</td>
-    <td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td>
-    <td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td>
-    <td class="note-cell">${t.note ? `📝 ${t.note}` : "—"}</td>
-  </tr>
-`).join("");
-    const logoBanner = settings?.logoBase64
-      ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>`
-      : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
-    const storeInfo = [
-      settings?.storePhone ? `טלפון: ${settings.storePhone}` : "",
-      settings?.storeAddress || "",
-    ].filter(Boolean).join(" · ");
+    const rows = transactions.map(t => `<tr><td>${fmtDate(t.date)}</td><td>${getTypeInfo(t.type).label}</td><td>${t.description || "—"}</td><td>${t.type === "payment" ? "—" : t.quantity || "—"}</td><td>${t.type === "payment" ? "—" : t.unitPrice || "—"}</td><td>${Number(t.amount || 0).toLocaleString("he-IL")} ₪</td><td class="note-cell">${t.note ? `📝 ${t.note}` : "—"}</td></tr>`).join("");
+    const logoBanner = settings?.logoBase64 ? `<div class="logo-banner"><img src="${settings.logoBase64}" style="max-height:90px;max-width:100%;object-fit:contain"/></div>` : `<div class="logo-banner logo-text">${settings?.storeName || ""}</div>`;
+    const storeInfo = [settings?.storePhone ? `טלפון: ${settings.storePhone}` : "", settings?.storeAddress || ""].filter(Boolean).join(" · ");
     const w = window.open("", "_blank", "width=1000,height=800");
     if (!w) return;
-    w.document.write(`<html dir="rtl"><head><title>ארכיון — ${customerName}</title><style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;direction:rtl;color:#111;background:#fff}
-.logo-banner{width:100%;background:#f8f8f8;border-bottom:2px solid #eee;display:flex;align-items:center;justify-content:center;padding:18px 32px;min-height:80px}
-.logo-text{font-size:26px;font-weight:800;color:#1a1a1a;letter-spacing:-0.5px}
-.store-info{text-align:center;font-size:12px;color:#888;padding:7px 32px 10px;border-bottom:1px solid #f0f0f0}
-.details{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 32px;border-bottom:1px solid #eee;font-size:12px;color:#555;line-height:1.9}
-.details strong{color:#111;font-size:13px}
-.details-right{text-align:right}
-.details-left{text-align:left;color:#666}
-.archive-badge{display:inline-block;background:#EEEDFE;color:#3C3489;border:1px solid #AFA9EC;border-radius:20px;padding:2px 12px;font-size:11px;font-weight:700;margin-bottom:6px}
-.content{padding:0 32px 32px}
-table{width:100%;border-collapse:collapse;margin-top:16px}
-th,td{border:1px solid #ddd;padding:9px 11px;text-align:right;font-size:13px}
-th{background:#f5f5f5;font-weight:700;color:#444}
-.note-cell{font-size:11px;color:#777;max-width:160px;word-break:break-word}
-tr:nth-child(even){background:#fafafa}
-.summary{margin-top:20px;border:1px solid #eee;border-radius:8px;overflow:hidden}
-.summary-row{display:flex;justify-content:space-between;padding:9px 16px;font-size:13px;border-bottom:1px solid #f0f0f0}
-.summary-row:last-child{border-bottom:none}
-.summary-row.total{background:#f5f5f5;font-size:16px;font-weight:800}
-.debt-color{color:#A32D2D}.pay-color{color:#0F6E56}.bal-color{color:#534AB7}
-.footer{margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center}
-</style></head><body>
-${logoBanner}
-${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}
-<div class="details">
-  <div class="details-right">
-    <div class="archive-badge">📦 חשבון מאורכב</div>
-    <div>לקוח: <strong>${customerName}</strong></div>
-    ${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}
-    ${data?.account?.customer?.idNumber ? `<div>ת.ז.: <strong>${data.account.customer.idNumber}</strong></div>` : ""}
-  </div>
-  <div class="details-left">
-    <div>תאריך הדפסה: <strong>${fmtDate(new Date())}</strong></div>
-    <div>פתיחה: <strong>${fmtDate(item.account.openedAt)}</strong></div>
-    <div>ארכוב: <strong>${fmtDate(item.account.archivedAt)}</strong></div>
-  </div>
-</div>
-<div class="content">
-<table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="summary">
-  <div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div>
-  <div class="summary-row total"><span>מאזן סופי</span><span class="bal-color">${Number(item.finalBalance || 0).toLocaleString("he-IL")} ₪</span></div>
-</div>
-${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}
-</div>
-<script>window.onload=()=>window.print()</script>
-</body></html>`);
+    w.document.write(`<html dir="rtl"><head><title>ארכיון — ${customerName}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;direction:rtl;color:#111;background:#fff}.logo-banner{width:100%;background:#f8f8f8;border-bottom:2px solid #eee;display:flex;align-items:center;justify-content:center;padding:18px 32px;min-height:80px}.logo-text{font-size:26px;font-weight:800;color:#1a1a1a}.store-info{text-align:center;font-size:12px;color:#888;padding:7px 32px 10px;border-bottom:1px solid #f0f0f0}.details{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 32px;border-bottom:1px solid #eee;font-size:12px;color:#555;line-height:1.9}.details strong{color:#111;font-size:13px}.details-right{text-align:right}.details-left{text-align:left;color:#666}.archive-badge{display:inline-block;background:#EEEDFE;color:#3C3489;border:1px solid #AFA9EC;border-radius:20px;padding:2px 12px;font-size:11px;font-weight:700;margin-bottom:6px}.content{padding:0 32px 32px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:9px 11px;text-align:right;font-size:13px}th{background:#f5f5f5;font-weight:700;color:#444}.note-cell{font-size:11px;color:#777;max-width:160px;word-break:break-word}tr:nth-child(even){background:#fafafa}.summary{margin-top:20px;border:1px solid #eee;border-radius:8px;overflow:hidden}.summary-row{display:flex;justify-content:space-between;padding:9px 16px;font-size:13px;border-bottom:1px solid #f0f0f0}.summary-row:last-child{border-bottom:none}.summary-row.total{background:#f5f5f5;font-size:16px;font-weight:800}.debt-color{color:#A32D2D}.pay-color{color:#0F6E56}.bal-color{color:#534AB7}.footer{margin-top:24px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;text-align:center}</style></head><body>${logoBanner}${storeInfo ? `<div class="store-info">${storeInfo}</div>` : ""}<div class="details"><div class="details-right"><div class="archive-badge">📦 חשבון מאורכב</div><div>לקוח: <strong>${customerName}</strong></div>${customerPhone ? `<div>טלפון: <strong>${customerPhone}</strong></div>` : ""}${data?.account?.customer?.idNumber ? `<div>ת.ז.: <strong>${data.account.customer.idNumber}</strong></div>` : ""}</div><div class="details-left"><div>תאריך הדפסה: <strong>${fmtDate(new Date())}</strong></div><div>פתיחה: <strong>${fmtDate(item.account.openedAt)}</strong></div><div>ארכוב: <strong>${fmtDate(item.account.archivedAt)}</strong></div></div></div><div class="content"><table><thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סכום</th><th>הערה</th></tr></thead><tbody>${rows}</tbody></table><div class="summary"><div class="summary-row"><span>סה״כ חובות</span><span class="debt-color">${debtsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ תשלומים</span><span class="pay-color">${paymentsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row"><span>סה״כ החזרות</span><span class="pay-color">${returnsTotal.toLocaleString("he-IL")} ₪</span></div><div class="summary-row total"><span>מאזן סופי</span><span class="bal-color">${Number(item.finalBalance || 0).toLocaleString("he-IL")} ₪</span></div></div>${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""}</div><script>window.onload=()=>window.print()</script></body></html>`);
     w.document.close();
   };
 
@@ -841,7 +864,6 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
         @keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
         .tx-row:hover { background:#fafafe !important; }
         .tx-row:hover .row-actions { opacity:1 !important; }
-        .batch-row:hover .row-del { opacity:1 !important; }
         input:focus, select:focus { border-color:#AFA9EC !important; box-shadow:0 0 0 3px #EEEDFE !important; }
         .tab-btn { border:none;background:none;cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:#aaa;border-bottom:2px solid transparent;transition:all 0.15s;font-family:inherit;white-space:nowrap; }
         .tab-btn.active { color:#534AB7;border-bottom-color:#534AB7; }
@@ -849,9 +871,6 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
         .note-wrap:hover .note-tooltip { opacity:1 !important; }
         .tx-table-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
         .arch-table-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
-        .batch-table-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
-        .cust-action-btn:hover { opacity:0.85; }
-        .row-del { opacity:0;transition:opacity 0.15s; }
         @media (max-width:700px) {
           .acc-header{padding:14px 16px !important}
           .acc-avatar{width:40px !important;height:40px !important;font-size:13px !important}
@@ -872,7 +891,9 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
 
       <EditCustomerModal open={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} customer={customer} onSaved={fetchData} knownLastNames={knownLastNames} />
       <DeleteCustomerModal open={deleteCustomerOpen} onClose={() => setDeleteCustomerOpen(false)} customer={customer} stats={deleteStats} onDeleted={() => navigate("/customers")} />
+      <CalcModal open={calcOpen} onClose={() => setCalcOpen(false)} items={items} onAdd={handleCalcAdd} />
 
+      {/* PIN Modal */}
       {pinOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => { setPinOpen(false); setPinCode(""); setPinError(""); }}>
@@ -896,6 +917,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
         </div>
       )}
 
+      {/* Archive Prompt */}
       {showArchivePrompt && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 420, padding: "28px 24px", boxShadow: "0 24px 60px rgba(0,0,0,0.18)", animation: "fadeIn 0.25s ease" }}>
@@ -917,6 +939,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
         </div>
       )}
 
+      {/* Archive Details Modal */}
       {archiveOpen && selectedArchive && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setArchiveOpen(false)}>
           <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 800, maxHeight: "85vh", overflow: "auto", padding: "20px 16px" }} onClick={e => e.stopPropagation()}>
@@ -981,18 +1004,8 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                   <div>
                     <div style={{ fontSize: 10, color: "#534AB7", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>חשבון לקוח</div>
                     <div className="acc-name" style={{ fontSize: 20, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.1 }}>{name}</div>
-                    {customer?.phone && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, color: "#aaa", fontSize: 12 }}>
-                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 2h3l1.5 3.5L6 7a7.9 7.9 0 004 4l1.5-1.5L15 11v3a1 1 0 01-1 1A13 13 0 012 3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
-                        <span>{customer.phone}</span>
-                      </div>
-                    )}
-                    {customer?.idNumber && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, color: "#bbb", fontSize: 11 }}>
-                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><circle cx="5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8 7h4M8 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-                        <span style={{ fontFamily: "monospace" }}>{customer.idNumber}</span>
-                      </div>
-                    )}
+                    {customer?.phone && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, color: "#aaa", fontSize: 12 }}><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 2h3l1.5 3.5L6 7a7.9 7.9 0 004 4l1.5-1.5L15 11v3a1 1 0 01-1 1A13 13 0 012 3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg><span>{customer.phone}</span></div>}
+                    {customer?.idNumber && <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, color: "#bbb", fontSize: 11 }}><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" /><circle cx="5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M8 7h4M8 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg><span style={{ fontFamily: "monospace" }}>{customer.idNumber}</span></div>}
                   </div>
                 </div>
               );
@@ -1070,34 +1083,20 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
 
               {/* Profit Modal */}
               {profitOpen && (() => {
-                let totalProfit = 0;
-                let counted = 0;
+                let totalProfit = 0; let counted = 0;
                 transactions.forEach(t => {
                   if (t.type !== "debt") return;
-                  const linkedItem = t.item
-                    ? items.find(it => String(it._id) === String(t.item?._id || t.item))
-                    : items.find(it => it.name === t.description);
-                  if (linkedItem?.costPrice) {
-                    const qty = Number(t.quantity || 1);
-                    totalProfit += Number(t.amount || 0) - linkedItem.costPrice * qty;
-                    counted++;
-                  }
+                  const linkedItem = t.item ? items.find(it => String(it._id) === String(t.item?._id || t.item)) : items.find(it => it.name === t.description);
+                  if (linkedItem?.costPrice) { const qty = Number(t.quantity || 1); totalProfit += Number(t.amount || 0) - linkedItem.costPrice * qty; counted++; }
                 });
                 const isPositive = totalProfit >= 0;
                 return (
                   <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setProfitOpen(false)}>
                     <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 320, padding: "28px 24px", direction: "rtl", textAlign: "center", boxShadow: "0 24px 60px rgba(0,0,0,0.2)", animation: "fadeIn 0.2s ease" }} onClick={e => e.stopPropagation()}>
-                      <div style={{ width: 48, height: 48, borderRadius: 14, background: isPositive ? C.teal.bg : C.red.bg, color: isPositive ? C.teal.icon : C.red.icon, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22 }}>
-                        {isPositive ? "↑" : "↓"}
-                      </div>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, background: isPositive ? C.teal.bg : C.red.bg, color: isPositive ? C.teal.icon : C.red.icon, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 22 }}>{isPositive ? "↑" : "↓"}</div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#aaa", marginBottom: 6, letterSpacing: "0.05em" }}>רווח מצטבר — {customer?.fullName || "לקוח"}</div>
-                      <div style={{ fontSize: 36, fontWeight: 800, color: isPositive ? C.teal.text : C.red.text, lineHeight: 1.1, marginBottom: 8 }}>
-                        {isPositive ? "+" : ""}{fmtCurrency(totalProfit)}
-                      </div>
-                      {counted === 0
-                        ? <div style={{ fontSize: 12, color: "#bbb", marginTop: 8 }}>אין פריטים עם מחיר עלות מוגדר</div>
-                        : <div style={{ fontSize: 12, color: "#bbb" }}>מחושב מתוך {counted} עסקאות</div>
-                      }
+                      <div style={{ fontSize: 36, fontWeight: 800, color: isPositive ? C.teal.text : C.red.text, lineHeight: 1.1, marginBottom: 8 }}>{isPositive ? "+" : ""}{fmtCurrency(totalProfit)}</div>
+                      {counted === 0 ? <div style={{ fontSize: 12, color: "#bbb", marginTop: 8 }}>אין פריטים עם מחיר עלות מוגדר</div> : <div style={{ fontSize: 12, color: "#bbb" }}>מחושב מתוך {counted} עסקאות</div>}
                       <button onClick={() => setProfitOpen(false)} style={{ marginTop: 20, background: "#f5f5f5", border: "none", borderRadius: 9, padding: "9px 28px", fontSize: 13, fontWeight: 600, color: "#555", cursor: "pointer" }}>סגור</button>
                     </div>
                   </div>
@@ -1111,11 +1110,18 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                     <div style={{ width: 3, height: 16, background: "#534AB7", borderRadius: 99 }} />
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#555", letterSpacing: "0.05em", textTransform: "uppercase" }}>הוסף עסקאות</span>
                   </div>
+                  {/* Action buttons: Calc + Scan */}
                   {batchType !== "payment" && (
-                    <button onClick={() => setScanMode(s => !s)} title={scanMode ? "ביטול סריקה" : "סרוק ברקוד"}
-                      style={{ display: "flex", alignItems: "center", gap: 6, background: scanMode ? C.purple.bg : "#f5f5f5", color: scanMode ? C.purple.text : "#666", border: `0.5px solid ${scanMode ? C.purple.border : "#ddd"}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", touchAction: "manipulation" }}>
-                      {Icon.scan} {scanMode ? "מבטל..." : "סרוק ברקוד"}
-                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setCalcOpen(true)} title="מחשבון מינונים"
+                        style={{ display: "flex", alignItems: "center", gap: 5, background: "#EEEDFE", color: "#534AB7", border: "0.5px solid #AFA9EC", borderRadius: 8, padding: "6px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>
+                        {Icon.flask} מינונים
+                      </button>
+                      <button onClick={() => setScanMode(s => !s)} title={scanMode ? "ביטול סריקה" : "סרוק ברקוד"}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: scanMode ? C.purple.bg : "#f5f5f5", color: scanMode ? C.purple.text : "#666", border: `0.5px solid ${scanMode ? C.purple.border : "#ddd"}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", touchAction: "manipulation" }}>
+                        {Icon.scan} {scanMode ? "מבטל..." : "סרוק"}
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1139,15 +1145,13 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                   </div>
                 </div>
 
-                {/* שורות — כפתור + מוטמע בשורה האחרונה */}
+                {/* שורות */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                   <datalist id="items-list-batch">{items.map(it => <option key={it._id} value={it.name} />)}</datalist>
                   {batchRows.map((row, i) => (
                     <div key={row.id} style={{ background: "#fff", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <input
-                          list="items-list-batch"
-                          value={row.description}
+                        <input list="items-list-batch" value={row.description}
                           onChange={e => {
                             const val = e.target.value;
                             const match = items.find(it => it.name === val);
@@ -1157,14 +1161,9 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                           placeholder={batchType === "payment" ? "אמצעי תשלום..." : "פריט / תיאור..."}
                           style={{ ...inputStyle, flex: "3 1 160px", minWidth: 120 }}
                         />
-                        {batchType !== "payment" && (
-                          <input type="number" value={row.quantity} onChange={e => updateRow(row.id, { quantity: e.target.value })} placeholder="כמות" style={{ ...inputStyle, flex: "1 1 60px", minWidth: 55, textAlign: "center" }} />
-                        )}
-                        {batchType !== "payment" && (
-                          <input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, { unitPrice: e.target.value })} placeholder="מחיר" style={{ ...inputStyle, flex: "1 1 70px", minWidth: 65, textAlign: "center" }} />
-                        )}
+                        {batchType !== "payment" && <input type="number" value={row.quantity} onChange={e => updateRow(row.id, { quantity: e.target.value })} placeholder="כמות" style={{ ...inputStyle, flex: "1 1 60px", minWidth: 55, textAlign: "center" }} />}
+                        {batchType !== "payment" && <input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, { unitPrice: e.target.value })} placeholder="מחיר" style={{ ...inputStyle, flex: "1 1 70px", minWidth: 65, textAlign: "center" }} />}
                         <input type="number" value={row.amount} onChange={e => updateRow(row.id, { amount: e.target.value })} placeholder="סכום ₪" style={{ ...inputStyle, flex: "1 1 80px", minWidth: 75, fontWeight: 700, textAlign: "center" }} />
-                        {/* + להוספת שורה חדשה — מופיע רק בשורה האחרונה, אייקון בלבד */}
                         {i === batchRows.length - 1 && (
                           <button onClick={addRow} title="הוסף שורה" style={{ width: 34, height: 36, borderRadius: 8, border: "0.5px solid #ddd", background: "#f5f5f5", color: "#555", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "manipulation" }}>
                             {Icon.plus}
@@ -1180,7 +1179,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                   ))}
                 </div>
 
-                {/* Footer — זר שמור במרכז */}
+                {/* Footer */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
                   {batchRows.length > 1 && batchTotal > 0 && (
                     <div style={{ textAlign: "center" }}>
@@ -1206,9 +1205,7 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.length === 0 && (
-                      <tr><td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#ccc", fontSize: 13 }}>אין עסקאות עדיין</td></tr>
-                    )}
+                    {transactions.length === 0 && <tr><td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#ccc", fontSize: 13 }}>אין עסקאות עדיין</td></tr>}
                     {transactions.map((t, i) => {
                       const isEditing = editingId === t._id;
                       const { color, prefix } = getTypeInfo(t.type);
@@ -1267,11 +1264,10 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
 
               {/* Transactions Mobile */}
               <div className="tx-cards" style={{ flexDirection: "column", gap: 8 }}>
-                {transactions.length === 0 ? (
-                  <div style={{ padding: "32px 0", textAlign: "center", color: "#ccc", fontSize: 13 }}>אין עסקאות עדיין</div>
-                ) : transactions.map(t => (
-                  <TxCard key={t._id} t={t} onEdit={startEdit} onDelete={handleDelete} />
-                ))}
+                {transactions.length === 0
+                  ? <div style={{ padding: "32px 0", textAlign: "center", color: "#ccc", fontSize: 13 }}>אין עסקאות עדיין</div>
+                  : transactions.map(t => <TxCard key={t._id} t={t} onEdit={startEdit} onDelete={handleDelete} />)
+                }
               </div>
 
               {/* Edit modal mobile */}
@@ -1332,18 +1328,12 @@ ${settings?.footerText ? `<div class="footer">${settings.footerText}</div>` : ""
                             <div style={{ display: "flex", gap: 6 }}>
                               <button onClick={async () => {
                                 try {
-                                  setArchiveDetailLoading(item.account._id);
-                                  setSelectedArchive(item);
-                                  setArchiveOpen(true);
+                                  setArchiveDetailLoading(item.account._id); setSelectedArchive(item); setArchiveOpen(true);
                                   const res = await api.get(`/accounts/archived/${item.account._id}`);
                                   setSelectedArchive({ ...item, transactions: res.data.transactions });
-                                } catch (err) {
-                                  setError(err.response?.data?.message || "שגיאה בטעינת הארכיון");
-                                  setArchiveOpen(false);
-                                } finally { setArchiveDetailLoading(false); }
-                              }} style={{ background: C.purple.bg, color: C.purple.text, border: "none", borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                                הצג
-                              </button>
+                                } catch (err) { setError(err.response?.data?.message || "שגיאה בטעינת הארכיון"); setArchiveOpen(false); }
+                                finally { setArchiveDetailLoading(false); }
+                              }} style={{ background: C.purple.bg, color: C.purple.text, border: "none", borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>הצג</button>
                               <button onClick={() => handlePrintArchive(item)} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f5f5f5", color: "#555", border: "0.5px solid #ddd", borderRadius: 7, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                                 {Icon.print} הדפס
                               </button>
