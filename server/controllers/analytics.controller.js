@@ -5,7 +5,6 @@ import Item from "../models/Item.js";
 import Quote from "../models/Quote.js";
 import DeliveryNote from "../models/DeliveryNote.js";
 
-// ─── Helper: حساب بداية ونهاية فترة ───────────────────────────────────────
 function getPeriodRange(period) {
   const now = new Date();
   const from = new Date();
@@ -16,22 +15,18 @@ function getPeriodRange(period) {
   } else if (period === "year") {
     from.setFullYear(now.getFullYear() - 1);
   } else {
-    // day
     from.setHours(0, 0, 0, 0);
   }
   from.setHours(0, 0, 0, 0);
   return { from, to: now };
 }
 
-// ─── GET /analytics/overview ──────────────────────────────────────────────
-// period: day | week | month | year
 export const getAnalyticsOverview = async (req, res) => {
   try {
     const userId = req.user._id;
     const period = req.query.period || "month";
     const { from, to } = getPeriodRange(period);
 
-    // ── جلب كل الزبائن ──
     const customers = await Customer.find({ createdBy: userId })
       .select("_id")
       .lean();
@@ -41,7 +36,6 @@ export const getAnalyticsOverview = async (req, res) => {
       return res.json(emptyResponse());
     }
 
-    // ── جلب كل الحسابات ──
     const accounts = await Account.find({
       customer: { $in: customerIds },
     }).lean();
@@ -49,16 +43,25 @@ export const getAnalyticsOverview = async (req, res) => {
     const openAccounts = accounts.filter((a) => a.status === "open");
     const openAccountIds = openAccounts.map((a) => a._id);
 
-    // ── 1) KPIs: رصيد إجمالي ──
+    // ── 1) KPIs ──
     const balancesAgg = openAccountIds.length > 0
       ? await Transaction.aggregate([
           { $match: { account: { $in: openAccountIds } } },
           {
             $group: {
               _id: "$account",
-              debtTotal: { $sum: { $cond: [{ $eq: ["$type", "debt"] }, "$amount", 0] } },
-              paymentTotal: { $sum: { $cond: [{ $eq: ["$type", "payment"] }, "$amount", 0] } },
-              returnTotal: { $sum: { $cond: [{ $eq: ["$type", "return"] }, "$amount", 0] } },
+              balance: {
+                $sum: {
+                  $switch: {
+                    branches: [
+                      { case: { $eq: ["$type", "debt"] },    then: { $abs: "$amount" } },
+                      { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                      { case: { $eq: ["$type", "return"] },  then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                    ],
+                    default: 0,
+                  },
+                },
+              },
             },
           },
         ])
@@ -69,15 +72,21 @@ export const getAnalyticsOverview = async (req, res) => {
     let customersInDebt = 0;
 
     for (const row of balancesAgg) {
-      const balance = Number(row.debtTotal) - Number(row.paymentTotal) - Number(row.returnTotal);
-      if (balance > 0) {
-        totalDebt += balance;
-        customersInDebt++;
-      }
-      totalPaid += Number(row.paymentTotal) + Number(row.returnTotal);
+      const balance = Number(row.balance ?? 0);
+      totalDebt += balance;
+      if (balance > 0) customersInDebt++;
     }
 
-    // ── 2) عسقات الفترة ──
+    // حساب totalPaid من transactions مباشرة
+    const paidAgg = openAccountIds.length > 0
+      ? await Transaction.aggregate([
+          { $match: { account: { $in: openAccountIds }, type: { $in: ["payment", "return"] } } },
+          { $group: { _id: null, total: { $sum: { $abs: "$amount" } } } },
+        ])
+      : [];
+    totalPaid = paidAgg[0]?.total || 0;
+
+    // ── 2) عملیات الفترة ──
     const periodTransactions = await Transaction.find({
       customer: { $in: customerIds },
       date: { $gte: from, $lte: to },
@@ -97,7 +106,7 @@ export const getAnalyticsOverview = async (req, res) => {
       .filter((t) => t.type === "return")
       .reduce((s, t) => s + Number(t.amount || 0), 0);
 
-    // ── 3) رسم بياني شهري (آخر 6 أشهر) ──
+    // ── 3) رسم بياني شهري ──
     const monthlyAgg = await Transaction.aggregate([
       {
         $match: {
@@ -120,7 +129,6 @@ export const getAnalyticsOverview = async (req, res) => {
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]);
 
-    // بناء بيانات الرسم البياني لآخر 6 أشهر
     const monthlyChart = buildMonthlyChart(monthlyAgg);
 
     // ── 4) أكثر الفئات مبيعاً ──
@@ -141,12 +149,10 @@ export const getAnalyticsOverview = async (req, res) => {
       const cat = tx.item.category || "ללא קטגוריה";
       const itemName = tx.item.name;
       const amt = Number(tx.amount || 0);
-
       categoryMap[cat] = (categoryMap[cat] || 0) + amt;
       itemMap[itemName] = (itemMap[itemName] || 0) + amt;
     }
 
-    // أيضاً حساب من description لمن لم يستخدم item
     const debtTxNoItems = periodTransactions.filter(
       (t) => t.type === "debt" && !t.item && t.description
     );
@@ -168,8 +174,6 @@ export const getAnalyticsOverview = async (req, res) => {
       .slice(0, 8);
 
     // ── 5) פעילות לפי יום בשבוע ──
-    // $dayOfWeek ב-MongoDB עובד ב-UTC בלבד
-    // ישראל = UTC+2 חורף / UTC+3 קיץ — חייבים timezone
     const weekdayAgg = await Transaction.aggregate([
       {
         $match: {
@@ -191,7 +195,6 @@ export const getAnalyticsOverview = async (req, res) => {
       },
     ]);
 
-    // 1=ראשון(א), 2=שני(ב), ... 7=שבת(ש)
     const hebrewDays = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
     const weekdayData = Array.from({ length: 7 }, (_, i) => {
       const mongoDay = i + 1;
@@ -203,7 +206,7 @@ export const getAnalyticsOverview = async (req, res) => {
       };
     });
 
-    // ── 6) أكبر المدينين حالياً ──
+    // ── 6) أكبر المدينين ──
     const accountCustomerMap = {};
     for (const acc of openAccounts) {
       accountCustomerMap[String(acc._id)] = acc.customer;
@@ -214,9 +217,18 @@ export const getAnalyticsOverview = async (req, res) => {
       {
         $group: {
           _id: "$account",
-          debtTotal: { $sum: { $cond: [{ $eq: ["$type", "debt"] }, "$amount", 0] } },
-          paymentTotal: { $sum: { $cond: [{ $eq: ["$type", "payment"] }, "$amount", 0] } },
-          returnTotal: { $sum: { $cond: [{ $eq: ["$type", "return"] }, "$amount", 0] } },
+          balance: {
+            $sum: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$type", "debt"] },    then: { $abs: "$amount" } },
+                  { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                  { case: { $eq: ["$type", "return"] },  then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                ],
+                default: 0,
+              },
+            },
+          },
         },
       },
     ]);
@@ -225,7 +237,7 @@ export const getAnalyticsOverview = async (req, res) => {
       .map((row) => ({
         accountId: row._id,
         customerId: accountCustomerMap[String(row._id)],
-        balance: Number(row.debtTotal) - Number(row.paymentTotal) - Number(row.returnTotal),
+        balance: Number(row.balance ?? 0),
       }))
       .filter((d) => d.balance > 0)
       .sort((a, b) => b.balance - a.balance)
@@ -324,7 +336,6 @@ export const getAnalyticsOverview = async (req, res) => {
   }
 };
 
-// ─── Helper: بناء بيانات الرسم الشهري ────────────────────────────────────
 function buildMonthlyChart(agg) {
   const now = new Date();
   const months = [];
@@ -354,7 +365,6 @@ function buildMonthlyChart(agg) {
   return months;
 }
 
-// ─── Helper: استجابة فارغة ────────────────────────────────────────────────
 function emptyResponse() {
   return {
     kpis: {
@@ -371,7 +381,6 @@ function emptyResponse() {
   };
 }
 
-// ─── GET /analytics/debt-distribution ────────────────────────────────────────
 export const getDebtDistribution = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -397,9 +406,18 @@ export const getDebtDistribution = async (req, res) => {
       {
         $group: {
           _id: "$account",
-          debtTotal:    { $sum: { $cond: [{ $eq: ["$type", "debt"] },    "$amount", 0] } },
-          paymentTotal: { $sum: { $cond: [{ $eq: ["$type", "payment"] }, "$amount", 0] } },
-          returnTotal:  { $sum: { $cond: [{ $eq: ["$type", "return"] },  "$amount", 0] } },
+          balance: {
+            $sum: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$type", "debt"] },    then: { $abs: "$amount" } },
+                  { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                  { case: { $eq: ["$type", "return"] },  then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                ],
+                default: 0,
+              },
+            },
+          },
         },
       },
     ]);
@@ -414,7 +432,7 @@ export const getDebtDistribution = async (req, res) => {
     let grandTotal = 0, grandCount = 0;
 
     for (const row of balancesAgg) {
-      const balance = Number(row.debtTotal) - Number(row.paymentTotal) - Number(row.returnTotal);
+      const balance = Number(row.balance ?? 0);
       if (balance <= 0) continue;
       grandTotal += balance;
       grandCount++;
