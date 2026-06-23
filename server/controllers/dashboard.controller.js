@@ -65,25 +65,25 @@ export const getDashboardStats = async (req, res) => {
 
     const balancesAgg = openAccountIds.length > 0
       ? await Transaction.aggregate([
-          { $match: { account: { $in: openAccountIds } } },
-          {
-            $group: {
-              _id: "$account",
-              balance: {
-                $sum: {
-                  $switch: {
-                    branches: [
-                      { case: { $eq: ["$type", "debt"] },    then: { $abs: "$amount" } },
-                      { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
-                      { case: { $eq: ["$type", "return"] },  then: { $multiply: [{ $abs: "$amount" }, -1] } },
-                    ],
-                    default: 0,
-                  },
+        { $match: { account: { $in: openAccountIds } } },
+        {
+          $group: {
+            _id: "$account",
+            balance: {
+              $sum: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ["$type", "debt"] }, then: { $abs: "$amount" } },
+                    { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                    { case: { $eq: ["$type", "return"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                  ],
+                  default: 0,
                 },
               },
             },
           },
-        ])
+        },
+      ])
       : [];
 
     const balanceMap = new Map();
@@ -98,9 +98,9 @@ export const getDashboardStats = async (req, res) => {
       balance: Number(balanceMap.get(String(acc._id)) || 0),
     }));
 
+    // ✅ الصحيح — يجمع كل الأرصدة
     const debtAccounts = openAccountsWithBalance.filter((acc) => acc.balance > 0);
-    const totalDebt = debtAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-    const customersInDebtCount = debtAccounts.length;
+    const totalDebt = openAccountsWithBalance.reduce((sum, acc) => sum + acc.balance, 0); const customersInDebtCount = debtAccounts.length;
     const topDebtors = debtAccounts
       .sort((a, b) => b.balance - a.balance)
       .slice(0, 5)
@@ -166,7 +166,7 @@ export const exportCustomersJson = async (req, res) => {
         transactions: transactions.length, items: items.length,
         quotes: quotes.length, deliveryNotes: deliveryNotes.length,
       },
-      files: ["_index.json","settings.json","items.json","customers.json","accounts.json","transactions.json","quotes.json","deliveryNotes.json"],
+      files: ["_index.json", "settings.json", "items.json", "customers.json", "accounts.json", "transactions.json", "quotes.json", "deliveryNotes.json"],
     };
 
     const settingsData = setting ? {
@@ -264,14 +264,14 @@ export const exportCustomersJson = async (req, res) => {
 
     const toBuffer = (data) => Buffer.from(JSON.stringify(data, null, 2), "utf-8");
 
-    archive.append(toBuffer(_index),            { name: "_index.json" });
-    archive.append(toBuffer(settingsData),       { name: "settings.json" });
-    archive.append(toBuffer(itemsData),          { name: "items.json" });
-    archive.append(toBuffer(customersData),      { name: "customers.json" });
-    archive.append(toBuffer(accountsData),       { name: "accounts.json" });
-    archive.append(toBuffer(transactionsData),   { name: "transactions.json" });
-    archive.append(toBuffer(quotesData),         { name: "quotes.json" });
-    archive.append(toBuffer(deliveryNotesData),  { name: "deliveryNotes.json" });
+    archive.append(toBuffer(_index), { name: "_index.json" });
+    archive.append(toBuffer(settingsData), { name: "settings.json" });
+    archive.append(toBuffer(itemsData), { name: "items.json" });
+    archive.append(toBuffer(customersData), { name: "customers.json" });
+    archive.append(toBuffer(accountsData), { name: "accounts.json" });
+    archive.append(toBuffer(transactionsData), { name: "transactions.json" });
+    archive.append(toBuffer(quotesData), { name: "quotes.json" });
+    archive.append(toBuffer(deliveryNotesData), { name: "deliveryNotes.json" });
 
     await archive.finalize();
   } catch (err) {
@@ -291,20 +291,20 @@ export const exportCustomersExcel = async (req, res) => {
     if (customers.length === 0)
       return res.status(404).json({ message: "אין לקוחות לייצוא" });
 
-    const HEADER_BG  = "FF534AB7";
+    const HEADER_BG = "FF534AB7";
     const SUBHEAD_BG = "FFEEEDFE";
-    const DEBT_BG    = "FFFCEBEB";
+    const DEBT_BG = "FFFCEBEB";
     const PAYMENT_BG = "FFE1F5EE";
-    const RETURN_BG  = "FFFAEEDA";
+    const RETURN_BG = "FFFAEEDA";
     const SUMMARY_BG = "FFF1EFE8";
-    const WHITE_BG   = "FFFFFFFF";
-    const STRIPE_BG  = "FFF9F9F9";
+    const WHITE_BG = "FFFFFFFF";
+    const STRIPE_BG = "FFF9F9F9";
 
     const border = {
-      top:    { style: "thin", color: { argb: "FFE0E0E0" } },
-      left:   { style: "thin", color: { argb: "FFE0E0E0" } },
+      top: { style: "thin", color: { argb: "FFE0E0E0" } },
+      left: { style: "thin", color: { argb: "FFE0E0E0" } },
       bottom: { style: "thin", color: { argb: "FFE0E0E0" } },
-      right:  { style: "thin", color: { argb: "FFE0E0E0" } },
+      right: { style: "thin", color: { argb: "FFE0E0E0" } },
     };
 
     const styleCell = (cell, { bgColor, fontColor = "FF1A1A1A", bold = false, align = "right", size = 10 } = {}) => {
@@ -314,7 +314,7 @@ export const exportCustomersExcel = async (req, res) => {
       cell.border = border;
     };
 
-    const typeMap   = { debt: "חוב", payment: "תשלום", return: "החזרה" };
+    const typeMap = { debt: "חוב", payment: "תשלום", return: "החזרה" };
     const typeColor = { debt: "FFA32D2D", payment: "FF0F6E56", return: "FF854F0B" };
 
     const workbook = new ExcelJS.Workbook();
@@ -337,12 +337,12 @@ export const exportCustomersExcel = async (req, res) => {
       const txs = txMap[String(c._id)] || [];
       const accList = accountMap[String(c._id)] || [];
       const acc = accList.find(a => a.status === "open") || accList[0];
-      const debts    = txs.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
+      const debts = txs.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
       const payments = txs.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
-      const returns  = txs.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
-      const balance  = debts - payments - returns;
+      const returns = txs.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
+      const balance = debts - payments - returns;
       let openedStr = "—";
-      if (acc?.openedAt) { try { openedStr = new Date(acc.openedAt).toLocaleDateString("he-IL"); } catch (_) {} }
+      if (acc?.openedAt) { try { openedStr = new Date(acc.openedAt).toLocaleDateString("he-IL"); } catch (_) { } }
 
       const bg = idx % 2 === 0 ? WHITE_BG : STRIPE_BG;
       const row = sumSheet.addRow([c.fullName, c.phone || "—", c.idNumber || "—", debts, payments, balance, txs.length, openedStr]);
@@ -365,7 +365,7 @@ export const exportCustomersExcel = async (req, res) => {
       ws.views = [{ rightToLeft: true }];
       ws.columns = [
         { width: 14 }, { width: 12 }, { width: 32 },
-        { width: 8  }, { width: 14 }, { width: 14 }, { width: 22 },
+        { width: 8 }, { width: 14 }, { width: 14 }, { width: 22 },
       ];
 
       ws.mergeCells("A1:G1");
@@ -381,12 +381,12 @@ export const exportCustomersExcel = async (req, res) => {
       ws.getCell("E2").value = c.phone || "—";
       ws.getCell("F2").value = "תאריך פתיחה:";
       let openedStr = "—";
-      if (acc?.openedAt) { try { openedStr = new Date(acc.openedAt).toLocaleDateString("he-IL"); } catch (_) {} }
+      if (acc?.openedAt) { try { openedStr = new Date(acc.openedAt).toLocaleDateString("he-IL"); } catch (_) { } }
       ws.getCell("G2").value = openedStr;
-      ["A","B","C","D","E","F","G"].forEach((col) => {
+      ["A", "B", "C", "D", "E", "F", "G"].forEach((col) => {
         styleCell(ws.getCell(`${col}2`), {
           bgColor: SUBHEAD_BG, fontColor: "FF3C3489",
-          bold: ["A","D","F"].includes(col),
+          bold: ["A", "D", "F"].includes(col),
         });
       });
       ws.getRow(2).height = 22;
@@ -406,7 +406,7 @@ export const exportCustomersExcel = async (req, res) => {
         ws.getRow(5).height = 20;
       } else {
         txs.forEach((tx) => {
-          const t  = tx.type;
+          const t = tx.type;
           const bg = t === "debt" ? DEBT_BG : t === "payment" ? PAYMENT_BG : RETURN_BG;
           const row = ws.addRow([
             tx.date ? new Date(tx.date).toLocaleDateString("he-IL") : "—",
@@ -427,16 +427,16 @@ export const exportCustomersExcel = async (req, res) => {
 
       ws.addRow([]);
 
-      const debts    = txs.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
+      const debts = txs.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
       const payments = txs.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
-      const returns  = txs.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
-      const balance  = debts - payments - returns;
+      const returns = txs.filter(t => t.type === "return").reduce((s, t) => s + Number(t.amount || 0), 0);
+      const balance = debts - payments - returns;
 
       [
-        ["סה״כ חובות:",  debts,    "FFA32D2D"],
+        ["סה״כ חובות:", debts, "FFA32D2D"],
         ["סה״כ תשלומים:", payments, "FF0F6E56"],
-        ["סה״כ החזרות:", returns,  "FF854F0B"],
-        ["יתרת חוב:",    balance,  "FF534AB7"],
+        ["סה״כ החזרות:", returns, "FF854F0B"],
+        ["יתרת חוב:", balance, "FF534AB7"],
       ].forEach(([label, val, fc]) => {
         const row = ws.addRow([label, val]);
         row.height = 22;
@@ -505,22 +505,22 @@ export const importBackup = async (req, res) => {
     ]);
 
     const customerIdMap = {};
-    const accountIdMap  = {};
-    const itemIdMap     = {};
-    const quoteIdMap    = {};
+    const accountIdMap = {};
+    const itemIdMap = {};
+    const quoteIdMap = {};
 
     // 1. Settings
     if (settings) {
       await Setting.findOneAndUpdate(
         { createdBy: userId },
         {
-          storeName:    settings.storeName    || "",
-          storePhone:   settings.storePhone   || "",
+          storeName: settings.storeName || "",
+          storePhone: settings.storePhone || "",
           storeAddress: settings.storeAddress || "",
-          footerText:   settings.footerText   || "",
-          logoBase64:   settings.logoBase64   || "",
-          vatRate:      settings.vatRate      ?? 18,
-          createdBy:    userId,
+          footerText: settings.footerText || "",
+          logoBase64: settings.logoBase64 || "",
+          vatRate: settings.vatRate ?? 18,
+          createdBy: userId,
         },
         { upsert: true }
       );
@@ -529,15 +529,15 @@ export const importBackup = async (req, res) => {
     // 2. Items — insertMany עם מיפוי IDs
     if (items?.length) {
       const itemDocs = items.map(item => ({
-        name:         item.name,
-        category:     item.category     || "",
-        costPrice:    item.costPrice    || 0,
+        name: item.name,
+        category: item.category || "",
+        costPrice: item.costPrice || 0,
         profitMargin: item.profitMargin || 0,
-        price:        item.price        || 0,
-        barcode:      item.barcode      || "",
-        note:         item.note         || "",
-        isActive:     item.isActive     ?? true,
-        createdBy:    userId,
+        price: item.price || 0,
+        barcode: item.barcode || "",
+        note: item.note || "",
+        isActive: item.isActive ?? true,
+        createdBy: userId,
       }));
       const createdItems = await Item.insertMany(itemDocs);
       items.forEach((item, i) => {
@@ -549,9 +549,9 @@ export const importBackup = async (req, res) => {
     if (customers?.length) {
       const customerDocs = customers.map(c => ({
         fullName: c.fullName,
-        phone:    c.phone    || "",
+        phone: c.phone || "",
         idNumber: c.idNumber || "",
-        note:     c.note     || "",
+        note: c.note || "",
         isActive: c.isActive ?? true,
         createdBy: userId,
       }));
@@ -565,13 +565,13 @@ export const importBackup = async (req, res) => {
     if (accounts?.length) {
       const validAccounts = accounts.filter(acc => customerIdMap[acc.customer]);
       const accountDocs = validAccounts.map(acc => ({
-        customer:    customerIdMap[acc.customer],
-        status:      acc.status,
-        openedAt:    acc.openedAt,
-        archivedAt:  acc.archivedAt  || null,
+        customer: customerIdMap[acc.customer],
+        status: acc.status,
+        openedAt: acc.openedAt,
+        archivedAt: acc.archivedAt || null,
         archiveNote: acc.archiveNote || "",
-        zeroedAt:    acc.zeroedAt    || null,
-        createdBy:   userId,
+        zeroedAt: acc.zeroedAt || null,
+        createdBy: userId,
       }));
       const createdAccounts = await Account.insertMany(accountDocs);
       validAccounts.forEach((acc, i) => {
@@ -583,17 +583,17 @@ export const importBackup = async (req, res) => {
     if (transactions?.length) {
       const txDocs = transactions
         .map(tx => ({
-          account:     accountIdMap[tx.account]   || null,
-          customer:    customerIdMap[tx.customer]  || null,
-          type:        tx.type,
-          date:        tx.date,
-          item:        tx.item ? (itemIdMap[tx.item] || null) : null,
+          account: accountIdMap[tx.account] || null,
+          customer: customerIdMap[tx.customer] || null,
+          type: tx.type,
+          date: tx.date,
+          item: tx.item ? (itemIdMap[tx.item] || null) : null,
           description: tx.description || "",
-          quantity:    tx.quantity    || 0,
-          unitPrice:   tx.unitPrice   || 0,
-          amount:      tx.amount      || 0,
-          note:        tx.note        || "",
-          createdBy:   userId,
+          quantity: tx.quantity || 0,
+          unitPrice: tx.unitPrice || 0,
+          amount: tx.amount || 0,
+          note: tx.note || "",
+          createdBy: userId,
         }))
         .filter(tx => tx.account && tx.customer);
       if (txDocs.length) await Transaction.insertMany(txDocs);
@@ -602,25 +602,25 @@ export const importBackup = async (req, res) => {
     // 6. Quotes — insertMany עם מיפוי IDs
     if (quotes?.length) {
       const quoteDocs = quotes.map(q => ({
-        customer:      q.customer ? (customerIdMap[q.customer] || null) : null,
-        customerName:  q.customerName  || "",
+        customer: q.customer ? (customerIdMap[q.customer] || null) : null,
+        customerName: q.customerName || "",
         customerPhone: q.customerPhone || "",
-        quoteNumber:   q.quoteNumber,
-        date:          q.date,
-        status:        q.status || "draft",
+        quoteNumber: q.quoteNumber,
+        date: q.date,
+        status: q.status || "draft",
         items: (q.items || []).map(qi => ({
-          date:        qi.date,
+          date: qi.date,
           description: qi.description || "",
-          quantity:    qi.quantity    || 0,
-          unitPrice:   qi.unitPrice   || 0,
-          amount:      qi.amount      || 0,
-          note:        qi.note        || "",
-          item:        qi.item ? (itemIdMap[qi.item] || null) : null,
+          quantity: qi.quantity || 0,
+          unitPrice: qi.unitPrice || 0,
+          amount: qi.amount || 0,
+          note: qi.note || "",
+          item: qi.item ? (itemIdMap[qi.item] || null) : null,
         })),
-        total:       q.total || 0,
-        note:        q.note  || "",
+        total: q.total || 0,
+        note: q.note || "",
         convertedAt: q.convertedAt || null,
-        createdBy:   userId,
+        createdBy: userId,
       }));
       const createdQuotes = await Quote.insertMany(quoteDocs);
       quotes.forEach((q, i) => {
@@ -632,27 +632,27 @@ export const importBackup = async (req, res) => {
     if (deliveryNotes?.length) {
       const dnDocs = deliveryNotes
         .map(dn => ({
-          customer:      customerIdMap[dn.customer] || null,
-          customerName:  dn.customerName  || "",
+          customer: customerIdMap[dn.customer] || null,
+          customerName: dn.customerName || "",
           customerPhone: dn.customerPhone || "",
-          noteNumber:    dn.noteNumber,
-          date:          dn.date,
-          status:        dn.status || "draft",
+          noteNumber: dn.noteNumber,
+          date: dn.date,
+          status: dn.status || "draft",
           items: (dn.items || []).map(di => ({
-            date:        di.date,
+            date: di.date,
             description: di.description || "",
-            quantity:    di.quantity    || 0,
-            unitPrice:   di.unitPrice   || 0,
-            amount:      di.amount      || 0,
-            note:        di.note        || "",
-            item:        di.item ? (itemIdMap[di.item] || null) : null,
+            quantity: di.quantity || 0,
+            unitPrice: di.unitPrice || 0,
+            amount: di.amount || 0,
+            note: di.note || "",
+            item: di.item ? (itemIdMap[di.item] || null) : null,
           })),
-          total:       dn.total   || 0,
-          note:        dn.note    || "",
-          isDirty:     dn.isDirty || false,
+          total: dn.total || 0,
+          note: dn.note || "",
+          isDirty: dn.isDirty || false,
           convertedAt: dn.convertedAt || null,
           sourceQuote: dn.sourceQuote ? (quoteIdMap[dn.sourceQuote] || null) : null,
-          createdBy:   userId,
+          createdBy: userId,
         }))
         .filter(dn => dn.customer);
       if (dnDocs.length) await DeliveryNote.insertMany(dnDocs);
@@ -665,17 +665,17 @@ export const importBackup = async (req, res) => {
     const maxNote = deliveryNotes?.length
       ? Math.max(...deliveryNotes.map(dn => parseInt((dn.noteNumber || "DN-0000").split("-")[1]) || 0))
       : 0;
-    if (maxQuote > 0) await Counter.findOneAndUpdate({ key: "quoteNumber" },        { seq: maxQuote }, { upsert: true });
-    if (maxNote  > 0) await Counter.findOneAndUpdate({ key: "deliveryNoteNumber" }, { seq: maxNote  }, { upsert: true });
+    if (maxQuote > 0) await Counter.findOneAndUpdate({ key: "quoteNumber" }, { seq: maxQuote }, { upsert: true });
+    if (maxNote > 0) await Counter.findOneAndUpdate({ key: "deliveryNoteNumber" }, { seq: maxNote }, { upsert: true });
 
     return res.json({
       message: "הגיבוי שוחזר בהצלחה",
       restored: {
-        customers:     Object.keys(customerIdMap).length,
-        accounts:      Object.keys(accountIdMap).length,
-        transactions:  transactions?.length || 0,
-        items:         Object.keys(itemIdMap).length,
-        quotes:        Object.keys(quoteIdMap).length,
+        customers: Object.keys(customerIdMap).length,
+        accounts: Object.keys(accountIdMap).length,
+        transactions: transactions?.length || 0,
+        items: Object.keys(itemIdMap).length,
+        quotes: Object.keys(quoteIdMap).length,
         deliveryNotes: deliveryNotes?.length || 0,
       },
     });
