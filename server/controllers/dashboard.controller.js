@@ -69,9 +69,18 @@ export const getDashboardStats = async (req, res) => {
           {
             $group: {
               _id: "$account",
-              debtTotal:    { $sum: { $cond: [{ $eq: ["$type", "debt"] },    "$amount", 0] } },
-              paymentTotal: { $sum: { $cond: [{ $eq: ["$type", "payment"] }, "$amount", 0] } },
-              returnTotal:  { $sum: { $cond: [{ $eq: ["$type", "return"] },  "$amount", 0] } },
+              balance: {
+                $sum: {
+                  $switch: {
+                    branches: [
+                      { case: { $eq: ["$type", "debt"] },    then: { $abs: "$amount" } },
+                      { case: { $eq: ["$type", "payment"] }, then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                      { case: { $eq: ["$type", "return"] },  then: { $multiply: [{ $abs: "$amount" }, -1] } },
+                    ],
+                    default: 0,
+                  },
+                },
+              },
             },
           },
         ])
@@ -79,9 +88,7 @@ export const getDashboardStats = async (req, res) => {
 
     const balanceMap = new Map();
     for (const row of balancesAgg) {
-      balanceMap.set(String(row._id),
-        Number(row.debtTotal || 0) - Number(row.paymentTotal || 0) - Number(row.returnTotal || 0)
-      );
+      balanceMap.set(String(row._id), Number(row.balance ?? 0));
     }
 
     const openAccountsWithBalance = openAccounts.map((acc) => ({
