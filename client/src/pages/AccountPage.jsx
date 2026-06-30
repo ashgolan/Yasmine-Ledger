@@ -48,7 +48,7 @@ const Icon = {
   check: <svg width="26" height="26" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   barcode: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="4" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="6" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="9" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="11" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="14" y="3" width="1" height="10" fill="currentColor" rx="0.5" /></svg>,
   scan: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1 5V2h3M12 2h3v3M1 11v3h3M12 14h3v-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M1 8h14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
-  flask: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 2v5L2 13h12L10 7V2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 2h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="6" cy="11" r="0.8" fill="currentColor"/><circle cx="9" cy="10" r="0.5" fill="currentColor"/></svg>,
+  flask: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 2v5L2 13h12L10 7V2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 2h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><circle cx="6" cy="11" r="0.8" fill="currentColor" /><circle cx="9" cy="10" r="0.5" fill="currentColor" /></svg>,
 };
 
 function StatCard({ label, value, icon, color }) {
@@ -124,6 +124,28 @@ function TxCard({ t, onEdit, onDelete }) {
 }
 
 // ── Dosage Calculator Modal ──────────────────────────────────────────────────
+// ── Dosage Calculator Modal ──────────────────────────────────────────────────
+function suggestMarkup(pricePerLiter, unitMl) {
+  // شرائح سعر اللتر → نسبة ربح أساسية (للكميات المتوسطة-الكبيرة, >100ml)
+  let baseMargin;
+  if (pricePerLiter <= 100) baseMargin = 1.00;       // 100%
+  else if (pricePerLiter <= 300) baseMargin = 0.70;  // 70%
+  else if (pricePerLiter <= 600) baseMargin = 0.50;  // 50%
+  else if (pricePerLiter <= 1000) baseMargin = 0.35; // 35%
+  else baseMargin = 0.20;                             // 20%
+
+  // معامل تصحيح حسب حجم الوحدة המוצעת
+  let sizeFactor;
+  if (unitMl <= 50) sizeFactor = 1.5;
+  else if (unitMl <= 100) sizeFactor = 1.25;
+  else if (unitMl <= 300) sizeFactor = 1.0;
+  else sizeFactor = 0.8;
+
+  const margin = baseMargin * sizeFactor; // נדגיש: זה % רווח, לא מקדם!
+  const markup = 1 + margin;              // מקדם = פי כמה מהעלות
+  return Math.round(markup * 100) / 100;
+}
+
 function CalcModal({ open, onClose, items, onAdd }) {
   const [itemId, setItemId] = useState("");
   const [containerLiters, setContainerLiters] = useState("");
@@ -134,11 +156,13 @@ function CalcModal({ open, onClose, items, onAdd }) {
   const [markupCustom, setMarkupCustom] = useState(2.5);
   const [customerMl, setCustomerMl] = useState("");
   const [roundPrice, setRoundPrice] = useState(true);
+  const [autoSuggest, setAutoSuggest] = useState(true);
+  const [suggestionApplied, setSuggestionApplied] = useState(false);
 
   useEffect(() => {
     if (open) {
       setItemId(""); setContainerLiters(""); setCustomerMl("");
-      setSellMode("10ml");
+      setSellMode("10ml"); setAutoSuggest(true); setSuggestionApplied(false);
     }
   }, [open]);
 
@@ -156,9 +180,20 @@ function CalcModal({ open, onClose, items, onAdd }) {
 
   // Unit calculations
   let unitMl = sellMode === "10ml" ? 10 : sellMode === "100ml" ? 100 : Number(customUnitMl) || 50;
+
+  // ── הצעת מקדם אוטומטית ──
+  const suggestedMarkup = pricePerLiter > 0 && ml > 0 ? suggestMarkup(pricePerLiter, ml) : null;
+
+  // החל הצעה אוטומטית כשמשתנים הנתונים הרלוונטיים, אם autoSuggest פעיל
+  useEffect(() => {
+    if (!autoSuggest || !suggestedMarkup) return;
+    if (sellMode === "10ml") setMarkup10(suggestedMarkup);
+    else if (sellMode === "100ml") setMarkup100(suggestedMarkup);
+    else setMarkupCustom(suggestedMarkup);
+    setSuggestionApplied(true);
+  }, [suggestedMarkup, sellMode, autoSuggest]);
+
   let markup = sellMode === "10ml" ? markup10 : sellMode === "100ml" ? markup100 : markupCustom;
-  // price per unitMl (selling) = (pricePerLiter / (1000/unitMl)) * markup
-  // equivalently: (pricePerLiter * unitMl / 1000) * markup
   const unitPriceRaw = pricePerLiter > 0 ? (pricePerLiter * unitMl / 1000) * markup : 0;
   const unitsCount = unitMl > 0 ? ml / unitMl : 0;
   const totalRaw = unitsCount * unitPriceRaw;
@@ -168,9 +203,23 @@ function CalcModal({ open, onClose, items, onAdd }) {
 
   const isValid = selectedItem && liters > 0 && ml > 0 && totalFinal > 0;
 
+  const handleManualMarkupChange = (v) => {
+    setAutoSuggest(false); // המשתמש שינה ידנית — בטל את ההצעה האוטומטית
+    if (sellMode === "10ml") setMarkup10(v);
+    else if (sellMode === "100ml") setMarkup100(v);
+    else setMarkupCustom(v);
+  };
+
+  const handleResetToSuggestion = () => {
+    if (!suggestedMarkup) return;
+    setAutoSuggest(true);
+    if (sellMode === "10ml") setMarkup10(suggestedMarkup);
+    else if (sellMode === "100ml") setMarkup100(suggestedMarkup);
+    else setMarkupCustom(suggestedMarkup);
+  };
+
   const handleAdd = () => {
     if (!isValid) return;
-    const unitLabel = sellMode === "10ml" ? "10 מ״ל" : sellMode === "100ml" ? "100 מ״ל" : `${customUnitMl} מ״ל`;
     onAdd({
       description: `${selectedItem.name} — ${ml} מ״ל`,
       amount: totalFinal,
@@ -261,10 +310,24 @@ function CalcModal({ open, onClose, items, onAdd }) {
               )}
             </div>
 
-            {/* Step 3: Selling mode */}
+            {/* Step 3: Customer quantity (moved up — needed for suggestion) */}
             <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.amber.bg, color: C.amber.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>3</div>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.teal.bg, color: C.teal.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>3</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>כמות ללקוח</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="number" value={customerMl} onChange={e => setCustomerMl(e.target.value)}
+                  placeholder="150" min="1"
+                  style={{ ...inputStyle, flex: 1, fontSize: 16, fontWeight: 600, textAlign: "center" }} />
+                <span style={{ fontSize: 13, color: "#888", fontWeight: 600, flexShrink: 0 }}>מ״ל</span>
+              </div>
+            </div>
+
+            {/* Step 4: Selling mode + markup (with auto-suggestion) */}
+            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.amber.bg, color: C.amber.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>4</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>אופן מכירה ומקדם רווח</span>
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -276,6 +339,23 @@ function CalcModal({ open, onClose, items, onAdd }) {
                   </button>
                 ))}
               </div>
+
+              {/* Auto-suggestion banner */}
+              {suggestedMarkup && (
+                <div style={{ marginBottom: 10, background: autoSuggest ? C.purple.bg : "#f5f5f5", border: `0.5px solid ${autoSuggest ? C.purple.border : "#ddd"}`, borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>💡</span>
+                    <span style={{ fontSize: 11, color: autoSuggest ? C.purple.text : "#888", fontWeight: 600 }}>
+                      {autoSuggest ? `מקדם מוצע אוטומטית: × ${suggestedMarkup}` : `מקדם מוצע: × ${suggestedMarkup} (לא הופעל)`}
+                    </span>
+                  </div>
+                  {!autoSuggest && (
+                    <button onClick={handleResetToSuggestion} style={{ background: C.purple.icon, color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      החל הצעה
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Custom unit + editable markup */}
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -289,14 +369,9 @@ function CalcModal({ open, onClose, items, onAdd }) {
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flex: sellMode === "custom" ? "none" : 1 }}>
                   <span style={{ fontSize: 11, color: "#888", flexShrink: 0 }}>מקדם:</span>
                   <input type="number"
-                    value={sellMode === "10ml" ? markup10 : sellMode === "100ml" ? markup100 : markupCustom}
-                    onChange={e => {
-                      const v = Number(e.target.value);
-                      if (sellMode === "10ml") setMarkup10(v);
-                      else if (sellMode === "100ml") setMarkup100(v);
-                      else setMarkupCustom(v);
-                    }}
-                    min="1" step="0.5"
+                    value={markup}
+                    onChange={e => handleManualMarkupChange(Number(e.target.value))}
+                    min="1" step="0.1"
                     style={{ ...inputStyle, width: 65, textAlign: "center" }} />
                 </div>
               </div>
@@ -313,25 +388,12 @@ function CalcModal({ open, onClose, items, onAdd }) {
               )}
             </div>
 
-            {/* Step 4: Customer quantity */}
-            <div style={{ background: "#FAFBFF", border: "0.5px solid #E8E8F0", borderRadius: 12, padding: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 22, height: 22, borderRadius: 6, background: C.teal.bg, color: C.teal.icon, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>4</div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>כמות ללקוח</span>
+            {/* Round toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "0 2px" }} onClick={() => setRoundPrice(r => !r)}>
+              <div style={{ width: 32, height: 18, borderRadius: 9, background: roundPrice ? C.purple.icon : "#ddd", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
+                <div style={{ position: "absolute", top: 2, right: roundPrice ? 2 : 14, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "right 0.2s" }} />
               </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="number" value={customerMl} onChange={e => setCustomerMl(e.target.value)}
-                  placeholder="150" min="1"
-                  style={{ ...inputStyle, flex: 1, fontSize: 16, fontWeight: 600, textAlign: "center" }} />
-                <span style={{ fontSize: 13, color: "#888", fontWeight: 600, flexShrink: 0 }}>מ״ל</span>
-              </div>
-              {/* Round toggle */}
-              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} onClick={() => setRoundPrice(r => !r)}>
-                <div style={{ width: 32, height: 18, borderRadius: 9, background: roundPrice ? C.purple.icon : "#ddd", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
-                  <div style={{ position: "absolute", top: 2, right: roundPrice ? 2 : 14, width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "right 0.2s" }} />
-                </div>
-                <span style={{ fontSize: 11, color: "#888" }}>עגל מחיר לחצי שקל קרוב</span>
-              </div>
+              <span style={{ fontSize: 11, color: "#888" }}>עגל מחיר לחצי שקל קרוב</span>
             </div>
 
             {/* Result card */}
