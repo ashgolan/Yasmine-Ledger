@@ -133,3 +133,101 @@ export const getArchivedAccountDetails = async (req, res) => {
     balance,
   });
 };
+
+// הוספת חשבונית לחשבון
+export const addInvoice = async (req, res) => {
+  const { accountId } = req.params;
+  const { number, amount, subject, date } = req.body;
+
+  if (!number || !String(number).trim()) {
+    return res.status(400).json({
+      message: "יש להזין מספר חשבונית.",
+    });
+  }
+
+  const account = await Account.findById(accountId);
+
+  if (!account) {
+    return res.status(404).json({
+      message: "החשבון לא נמצא.",
+    });
+  }
+
+  account.invoices.push({
+    number: String(number).trim(),
+    amount: Number(amount) || 0,
+    subject: (subject || "").trim(),
+    date: date ? new Date(date) : new Date(),
+  });
+
+  await account.save();
+
+  res.status(200).json({
+    message: "החשבונית נוספה בהצלחה.",
+    invoices: account.invoices,
+  });
+};
+
+// עדכון חשבונית קיימת
+export const updateInvoice = async (req, res) => {
+  const { accountId, invoiceId } = req.params;
+  const { number, amount, subject, date } = req.body;
+
+  if (!number || !String(number).trim()) {
+    return res.status(400).json({
+      message: "יש להזין מספר חשבונית.",
+    });
+  }
+
+  const account = await Account.findById(accountId);
+
+  if (!account) {
+    return res.status(404).json({
+      message: "החשבון לא נמצא.",
+    });
+  }
+
+  const invoice = account.invoices.id(invoiceId);
+
+  if (!invoice) {
+    return res.status(404).json({
+      message: "החשבונית לא נמצאה.",
+    });
+  }
+
+  invoice.number = String(number).trim();
+  invoice.amount = Number(amount) || 0;
+  invoice.subject = (subject || "").trim();
+  invoice.date = date ? new Date(date) : invoice.date;
+
+  await account.save();
+
+  res.status(200).json({
+    message: "החשבונית עודכנה בהצלחה.",
+    invoices: account.invoices,
+  });
+};
+
+// מחיקת חשבונית מהחשבון
+export const deleteInvoice = async (req, res) => {
+  const { accountId, invoiceId } = req.params;
+
+  const account = await Account.findById(accountId);
+
+  if (!account) {
+    return res.status(404).json({
+      message: "החשבון לא נמצא.",
+    });
+  }
+
+  account.invoices = account.invoices.filter(
+    (inv) => String(inv._id) !== String(invoiceId)
+  );
+
+  await account.save();
+
+  res.status(200).json({
+    message: "החשבונית נמחקה.",
+    invoices: account.invoices,
+  });
+};

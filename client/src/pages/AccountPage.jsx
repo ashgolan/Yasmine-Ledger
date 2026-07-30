@@ -49,6 +49,7 @@ const Icon = {
   barcode: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="4" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="6" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="9" y="3" width="1" height="10" fill="currentColor" rx="0.5" /><rect x="11" y="3" width="2" height="10" fill="currentColor" rx="0.5" /><rect x="14" y="3" width="1" height="10" fill="currentColor" rx="0.5" /></svg>,
   scan: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1 5V2h3M12 2h3v3M1 11v3h3M12 14h3v-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M1 8h14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
   flask: <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 2v5L2 13h12L10 7V2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 2h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /><circle cx="6" cy="11" r="0.8" fill="currentColor" /><circle cx="9" cy="10" r="0.5" fill="currentColor" /></svg>,
+  star: <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.2l2.02 4.32 4.78.65-3.47 3.33.86 4.75L8 11.98l-4.19 2.27.86-4.75-3.47-3.33 4.78-.65L8 1.2z" /></svg>,
 };
 
 function StatCard({ label, value, icon, color }) {
@@ -618,6 +619,83 @@ function DeleteCustomerModal({ open, onClose, customer, stats, onDeleted }) {
   );
 }
 
+// ── Invoice Modal ──
+function InvoiceModal({ open, onClose, accountId, invoice, onSaved }) {
+  const isEdit = !!invoice;
+  const emptyForm = () => ({
+    number: invoice?.number || "",
+    amount: invoice?.amount ?? "",
+    subject: invoice?.subject || "",
+    date: invoice?.date ? new Date(invoice.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  });
+  const [form, setForm] = useState(emptyForm());
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) { setForm(emptyForm()); setError(""); }
+  }, [open, invoice]);
+
+  const handleClose = () => { if (loading) return; onClose(); };
+  const handleSave = async () => {
+    if (!form.number.trim()) { setError("יש להזין מספר חשבונית"); return; }
+    try {
+      setLoading(true); setError("");
+      const payload = {
+        number: form.number.trim(),
+        amount: Number(form.amount) || 0,
+        subject: form.subject.trim(),
+        date: form.date ? new Date(form.date + "T12:00:00").toISOString() : new Date().toISOString(),
+      };
+      if (isEdit) {
+        await api.put(`/accounts/${accountId}/invoices/${invoice._id}`, payload);
+      } else {
+        await api.post(`/accounts/${accountId}/invoices`, payload);
+      }
+      onSaved(); onClose();
+    } catch (err) { setError(err.response?.data?.message || "שגיאה בשמירת החשבונית"); }
+    finally { setLoading(false); }
+  };
+
+  if (!open) return null;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={handleClose}>
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 380, padding: "24px 20px", direction: "rtl", animation: "fadeIn 0.2s ease" }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: "#F5C518" }}>{Icon.star}</span> {isEdit ? "עריכת חשבונית" : "הוספת חשבונית"}
+            </div>
+            <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{isEdit ? "עדכן את פרטי החשבונית" : "סמן שהונפקה חשבונית ללקוח"}</div>
+          </div>
+          <button onClick={handleClose} style={{ background: "#f5f5f5", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>{Icon.close}</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Field label="מספר חשבונית *">
+            <input autoFocus value={form.number} onChange={e => setForm({ ...form, number: e.target.value })} onKeyDown={e => e.key === "Enter" && handleSave()} placeholder="1024" style={inputStyle} />
+          </Field>
+          <Field label="סכום">
+            <input type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} onKeyDown={e => e.key === "Enter" && handleSave()} placeholder="0" style={inputStyle} />
+          </Field>
+          <Field label="נושא / תיאור">
+            <input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} onKeyDown={e => e.key === "Enter" && handleSave()} placeholder="לדוגמה: אספקת סחורה" style={inputStyle} />
+          </Field>
+          <Field label="תאריך">
+            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} style={inputStyle} />
+          </Field>
+        </div>
+        {error && <div style={{ background: C.red.bg, color: C.red.text, border: `0.5px solid ${C.red.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 12, fontWeight: 600, marginTop: 12 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <button onClick={handleSave} disabled={loading} style={{ background: "#F5C518", color: "#4a3b00", border: "none", borderRadius: 9, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "שומר..." : isEdit ? "שמור שינויים" : "שמור חשבונית"}
+          </button>
+          <button onClick={handleClose} disabled={loading} style={{ background: "#f5f5f5", color: "#555", border: "none", borderRadius: 9, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>ביטול</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AccountPage() {
   const { customerId } = useParams();
@@ -650,6 +728,11 @@ export default function AccountPage() {
   const [pinLoading, setPinLoading] = useState(false);
   const [pinShake, setPinShake] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [invoicesExpanded, setInvoicesExpanded] = useState(false);
+  const openAddInvoice = () => { setEditingInvoice(null); setInvoiceOpen(true); };
+  const openEditInvoice = (inv) => { setEditingInvoice(inv); setInvoiceOpen(true); };
 
   const handlePinSubmit = async () => {
     if (!pinCode.trim()) return;
@@ -826,6 +909,14 @@ export default function AccountPage() {
     finally { setArchiving(false); }
   };
 
+  const handleDeleteInvoice = async (invoiceId) => {
+    const accountId = data?.account?._id;
+    if (!accountId) return;
+    if (!window.confirm("האם למחוק את החשבונית?")) return;
+    try { await api.delete(`/accounts/${accountId}/invoices/${invoiceId}`); await fetchData(); }
+    catch (err) { setError(err.response?.data?.message || "שגיאה במחיקת החשבונית"); }
+  };
+
   const openDeleteModal = async () => {
     setDeleteStats(null); setDeleteCustomerOpen(true);
     try {
@@ -917,6 +1008,7 @@ export default function AccountPage() {
   const debtsTotal = transactions.filter(t => t.type === "debt").reduce((s, t) => s + Number(t.amount || 0), 0);
   const paymentsTotal = transactions.filter(t => t.type === "payment").reduce((s, t) => s + Number(t.amount || 0), 0);
   const customer = data?.account?.customer;
+  const invoices = data?.account?.invoices || [];
 
   return (
     <div style={{ direction: "rtl", minHeight: "100vh", background: "#F5F6FA", padding: "16px", boxSizing: "border-box", fontFamily: "'Segoe UI','Arial Hebrew',Arial,sans-serif" }}>
@@ -924,6 +1016,7 @@ export default function AccountPage() {
         @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes shake  { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
+        @keyframes glow   { 0%,100%{box-shadow:0 0 0 0 rgba(245,197,24,0.45),0 0 16px 2px rgba(245,197,24,0.3)} 50%{box-shadow:0 0 0 6px rgba(245,197,24,0),0 0 26px 6px rgba(245,197,24,0.55)} }
         .tx-row:hover { background:#fafafe !important; }
         .tx-row:hover .row-actions { opacity:1 !important; }
         input:focus, select:focus { border-color:#AFA9EC !important; box-shadow:0 0 0 3px #EEEDFE !important; }
@@ -954,6 +1047,7 @@ export default function AccountPage() {
       <EditCustomerModal open={editCustomerOpen} onClose={() => setEditCustomerOpen(false)} customer={customer} onSaved={fetchData} knownLastNames={knownLastNames} />
       <DeleteCustomerModal open={deleteCustomerOpen} onClose={() => setDeleteCustomerOpen(false)} customer={customer} stats={deleteStats} onDeleted={() => navigate("/customers")} />
       <CalcModal open={calcOpen} onClose={() => setCalcOpen(false)} items={items} onAdd={handleCalcAdd} />
+      <InvoiceModal open={invoiceOpen} onClose={() => setInvoiceOpen(false)} accountId={data?.account?._id} invoice={editingInvoice} onSaved={fetchData} />
 
       {/* PIN Modal */}
       {pinOpen && (
@@ -1077,11 +1171,74 @@ export default function AccountPage() {
             <Printer size={22} strokeWidth={1.6} onClick={handlePrint} title="הדפס" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s" }} onMouseEnter={e => e.currentTarget.style.color = "#1a1a1a"} onMouseLeave={e => e.currentTarget.style.color = "#888"} />
             <FileText size={22} strokeWidth={1.6} onClick={handleExportPDF} title="הורד PDF" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s" }} onMouseEnter={e => e.currentTarget.style.color = "#C2410C"} onMouseLeave={e => e.currentTarget.style.color = "#888"} />
             <FaWhatsapp size={22} onClick={handleWhatsApp} title="שתף ב-WhatsApp" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s" }} onMouseEnter={e => e.currentTarget.style.color = "#25D366"} onMouseLeave={e => e.currentTarget.style.color = "#888"} />
+            <span onClick={openAddInvoice} title="הוסף חשבונית" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s", display: "flex", alignItems: "center" }} onMouseEnter={e => e.currentTarget.style.color = "#F5C518"} onMouseLeave={e => e.currentTarget.style.color = "#888"}>
+              <span style={{ transform: "scale(1.4)", display: "inline-flex" }}>{Icon.star}</span>
+            </span>
             <span onClick={() => setPinOpen(true)} title="רווח" style={{ fontSize: 20, cursor: "pointer", opacity: 0.6, transition: "opacity 0.15s" }} onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0.6}>💰</span>
             <Pencil size={20} strokeWidth={1.6} onClick={() => setEditCustomerOpen(true)} title="ערוך פרטים" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s" }} onMouseEnter={e => e.currentTarget.style.color = "#534AB7"} onMouseLeave={e => e.currentTarget.style.color = "#888"} />
             <Trash2 size={20} strokeWidth={1.6} onClick={openDeleteModal} title="מחק לקוח" style={{ cursor: "pointer", color: "#888", transition: "color 0.15s" }} onMouseEnter={e => e.currentTarget.style.color = "#DC2626"} onMouseLeave={e => e.currentTarget.style.color = "#888"} />
           </div>
         </div>
+
+        {/* Invoices Banner */}
+        {invoices.length > 0 && (() => {
+          const single = invoices.length === 1;
+          return (
+            <div style={{
+              background: "linear-gradient(135deg, #FFF7E0 0%, #FFEFC2 100%)",
+              border: "1.5px solid #F5C518",
+              borderRadius: 14,
+              padding: "14px 18px",
+              animation: "glow 2.2s ease-in-out infinite",
+            }}>
+              <div
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: invoices.length > 1 ? "pointer" : "default" }}
+                onClick={() => invoices.length > 1 && setInvoicesExpanded(v => !v)}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "#F5C518", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{Icon.star}</div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#7A5B00" }}>
+                      {single ? "הונפקה חשבונית ללקוח" : `הונפקו ${invoices.length} חשבוניות ללקוח`}
+                    </div>
+                    {single && (
+                      <div style={{ fontSize: 12, color: "#8A6D00", marginTop: 2 }}>
+                        מס' {invoices[0].number}{invoices[0].amount ? ` · ${fmtCurrency(invoices[0].amount)}` : ""}{invoices[0].subject ? ` · ${invoices[0].subject}` : ""}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {single && (
+                    <>
+                      <button onClick={(e) => { e.stopPropagation(); openEditInvoice(invoices[0]); }} title="עריכת חשבונית" style={{ background: "rgba(255,255,255,0.6)", border: "none", borderRadius: 7, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#7A5B00" }}>{Icon.edit}</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoices[0]._id); }} title="מחיקת חשבונית" style={{ background: "rgba(255,255,255,0.6)", border: "none", borderRadius: 7, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#B08A00" }}>{Icon.close}</button>
+                    </>
+                  )}
+                  {invoices.length > 1 && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#8A6D00" }}>{invoicesExpanded ? "הסתר ▲" : "הצג ▼"}</span>
+                  )}
+                </div>
+              </div>
+              {invoices.length > 1 && invoicesExpanded && (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {invoices.map(inv => (
+                    <div key={inv._id} style={{ background: "#fff", border: "0.5px solid #F0DA8A", borderRadius: 9, padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 12, color: "#4a3b00" }}>
+                        <strong>מס' {inv.number}</strong>{inv.subject ? ` · ${inv.subject}` : ""}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#7A5B00" }}>{fmtCurrency(inv.amount)}</span>
+                        <button onClick={(e) => { e.stopPropagation(); openEditInvoice(inv); }} title="עריכה" style={{ background: "none", border: "none", cursor: "pointer", color: "#7A5B00", opacity: 0.7, padding: 2 }}>{Icon.edit}</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(inv._id); }} title="מחיקה" style={{ background: "none", border: "none", cursor: "pointer", color: "#B08A00", opacity: 0.6, padding: 2 }}>{Icon.close}</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {error && <div style={{ background: "#FCEBEB", color: "#791F1F", border: "0.5px solid #F09595", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>{error}</div>}
 
